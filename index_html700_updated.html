@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BNX FF SHOP — Ultimate Cyber Hacker Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile, setPersistence, browserLocalPersistence, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyDCe_WjWwV9zzDx_fNj70KXtQXe6TmPZPU",
+          authDomain: "ai-ff-store.firebaseapp.com",
+          projectId: "ai-ff-store",
+          storageBucket: "ai-ff-store.firebasestorage.app",
+          messagingSenderId: "157260493744",
+          appId: "1:157260493744:web:755dfbb9386ed4536a1c75",
+          measurementId: "G-E4YG5CW1K7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.dbRef = ref;
+        window.dbSet = set;
+        window.dbOnValue = onValue;
+
+        // ---------- Auth exposure ----------
+        window.auth = auth;
+        window.fbSignUp = (email, pass) => createUserWithEmailAndPassword(auth, email, pass);
+        window.fbSignIn = (email, pass) => signInWithEmailAndPassword(auth, email, pass);
+        window.fbSignOut = () => signOut(auth);
+        window.fbUpdateProfile = (user, data) => updateProfile(user, data);
+        window.fbSendPasswordReset = (email) => sendPasswordResetEmail(auth, email);
+
+        setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) __startSync(); else __stopSync();
+            if (typeof window.handleAuthStateChange === 'function') {
+                window.handleAuthStateChange(user);
+            } else {
+                window.__pendingAuthUser = user;
+                window.__pendingAuthReady = true;
+            }
+        });
+
+        let __unsubs = [];
+        function __startSync() {
+        if (__unsubs.length) return;
+        __unsubs.push(onValue(ref(db, 'listings'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                window.listings = Object.values(data);
+                localStorage.setItem('ff_listings', JSON.stringify(window.listings));
+                if (typeof renderListings === 'function') renderListings();
+                if (typeof checkPriceDrops === 'function') checkPriceDrops();
+            } else {
+                window.listings = [];
+                localStorage.setItem('ff_listings', '[]');
+                if (typeof renderListings === 'function') renderListings();
+            }
+        }, (e) => console.error(e)));
+
+        // Real-time sync for settings (no password stored here anymore)
+        __unsubs.push(onValue(ref(db, 'settings'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                if (data.promoCode) {
+                    window.promoCode = data.promoCode;
+                    localStorage.setItem('ff_promo_code', window.promoCode);
+                }
+                if (data.promoCfg) {
+                    localStorage.setItem('ff_promo_cfg', JSON.stringify(data.promoCfg));
+                }
+                if (data.uidFilterTg) {
+                    window.uidFilterTg = data.uidFilterTg;
+                    localStorage.setItem('ff_uid_filter_tg', window.uidFilterTg);
+                }
+                if (data.socials) {
+                    window.socialLinks = data.socials;
+                    localStorage.setItem('ff_socials', JSON.stringify(window.socialLinks));
+                }
+                if (data.offer) {
+                    window.offerSettings = data.offer;
+                    localStorage.setItem('ff_offer', JSON.stringify(window.offerSettings));
+                }
+                if (typeof data.bgPhotoUrl === 'string') {
+                    localStorage.setItem('ff_bg_photo_url', data.bgPhotoUrl);
+                    if (typeof window.applyRemoteBgPhoto === 'function') window.applyRemoteBgPhoto(data.bgPhotoUrl);
+                }
+                // Real-time sync for background audio settings
+                if (data.audio) {
+                    window.remoteAudio = data.audio;
+                    if (typeof window.applyRemoteAudio === 'function') window.applyRemoteAudio(data.audio);
+                }
+                if (typeof window.syncRemoteSettings === 'function') window.syncRemoteSettings(data);
+            }
+        }, (e) => console.error(e)));
+        }
+        function __stopSync() { __unsubs.forEach(u => u()); __unsubs = []; }
+    </script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#030508',
+                            card: '#0A0F1D',
+                            border: '#1B2A4A',
+                            cyan: '#00F0FF',
+                            gold: '#FFD700',
+                            red: '#FF2E63',
+                            hacker: '#00FF66'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        code: ['Courier Prime', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hidden { display: none !important; }
+        #listingsGrid .cyber-card {
+            background: linear-gradient(135deg, rgba(10, 15, 29, 0.35) 0%, rgba(5, 8, 15, 0.35) 100%) !important;
+            backdrop-filter: none !important;
+        }
+        body {
+            background-color: #030508;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #E2E8F0;
+            font-family: 'Outfit', sans-serif;
+        }
+        .bg-brand-card { background-color: rgba(10,15,29,.55) !important; }
+        .bg-brand-dark { background-color: rgba(5,8,15,.5) !important; }
+        .cyber-card { background: linear-gradient(135deg, rgba(10,15,29,.78) 0%, rgba(5,8,15,.78) 100%) !important; }
+        .hacker-glow { text-shadow: 0 0 10px rgba(0, 255, 102, 0.8); }
+        .cyber-card {
+            background: linear-gradient(135deg, rgba(10, 15, 29, 0.95) 0%, rgba(5, 8, 15, 0.95) 100%);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.12);
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+        .stylish-btn {
+            background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+        }
+        .stylish-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.8);
+        }
+        .rotating-logo { animation: spin 8s linear infinite; }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .hightech-box {
+            background: rgba(3, 5, 8, 0.9);
+            border: 1px dashed rgba(0, 240, 255, 0.4);
+            box-shadow: inset 0 0 15px rgba(0, 240, 255, 0.1);
+        }
+        .matrix-terminal {
+            background: #000;
+            border: 1px solid #00FF66;
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+        }
+
+        /* Offline blocker (always on top of every other screen) */
+        #offlineOverlay {
+            position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+            z-index: 100010;
+            background: rgba(0, 0, 0, 0.97);
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px;
+            font-family: 'Outfit', Arial, sans-serif;
+        }
+        #offlineOverlay .offline-card {
+            width: 100%; max-width: 380px;
+            background: #0A0F1D;
+            border: 2px solid #FF2E63;
+            border-radius: 24px;
+            padding: 26px 20px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 46, 99, 0.45);
+        }
+        #offlineOverlay .offline-icon { font-size: 44px; margin-bottom: 8px; }
+        #offlineOverlay h3 { color: #FF2E63; font-size: 17px; font-weight: 800; margin: 0 0 10px 0; }
+        #offlineOverlay p { color: #CBD5E1; font-size: 13px; line-height: 1.6; margin: 0 0 16px 0; }
+        #offlineOverlay button {
+            width: 100%; padding: 11px 14px; border: none; border-radius: 14px;
+            background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+            color: #000; font-weight: 800; font-size: 13px; cursor: pointer;
+        }
+
+        /* Auth gate + Ban screen */
+        #authGateOverlay, #banScreenOverlay {
+            position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+            background: rgba(0,0,0,0.98);
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px;
+        }
+        #authGateOverlay { z-index: 100000; }
+        #banScreenOverlay { z-index: 100001; }
+        .block-card {
+            width: 100%; max-width: 380px;
+            background: #0A0F1D;
+            border: 2px solid #FF2E63;
+            border-radius: 24px;
+            padding: 26px 20px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 46, 99, 0.45);
+        }
+        .block-card .block-icon { font-size: 44px; margin-bottom: 8px; }
+        .block-card h3 { color: #FF2E63; font-size: 17px; font-weight: 800; margin: 0 0 10px 0; }
+        .block-card p { color: #CBD5E1; font-size: 13px; line-height: 1.6; margin: 0 0 16px 0; }
+        .block-card button {
+            width: 100%; padding: 11px 14px; border: none; border-radius: 14px;
+            background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+            color: #000; font-weight: 800; font-size: 13px; cursor: pointer;
+        }
+
+        /* Password strength bar */
+        #pwStrengthBar { height: 4px; border-radius: 4px; transition: all 0.3s ease; width: 0%; }
+    
+        /* size lock: icons/logo stay small even if CDN loads late */
+        #adminLogo{width:40px!important;height:40px!important;min-width:40px;max-width:40px;flex:none!important;border-radius:9999px;overflow:hidden}
+        #adminLogo img{width:100%!important;height:100%!important;object-fit:cover;display:block}
+        .sbtn{width:28px!important;height:28px!important;min-width:28px;flex:none!important;display:flex;align-items:center;justify-content:center;border-radius:9999px}
+        .sbtn i{font-size:12px!important;line-height:1!important}
+        header i.fas,header i.fab{line-height:1}
+        .pi{width:18px;height:18px;flex:none;display:inline-block;vertical-align:-3px}
+        /* promo hi-tech */
+        .promo-card{position:relative;overflow:hidden;border:1px solid rgba(0,240,255,.35)}
+        .promo-card::before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(0,240,255,.08) 50%,transparent 70%);transform:translateX(-100%);animation:promoSweep 4s linear infinite;pointer-events:none}
+        @keyframes promoSweep{to{transform:translateX(100%)}}
+        .promo-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(0,240,255,.25),rgba(0,255,102,.2));border:1px solid rgba(0,240,255,.5);box-shadow:0 0 14px rgba(0,240,255,.45);flex:none}
+        .promo-bal{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;background:linear-gradient(135deg,rgba(255,215,0,.18),rgba(0,255,102,.15));border:1px solid rgba(255,215,0,.5);color:#FFD700;font-family:'Courier Prime',monospace;font-weight:700;font-size:11px;box-shadow:0 0 10px rgba(255,215,0,.25)}
+        .promo-apply{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:12px;font-weight:800;font-size:12px;color:#000;background:linear-gradient(135deg,#00FF66,#00F0FF);box-shadow:0 0 16px rgba(0,255,102,.5);transition:.25s}
+        .promo-apply:hover{transform:translateY(-2px);box-shadow:0 0 26px rgba(0,255,102,.8)}
+        .promo-card{border-radius:6px !important;border:1px solid rgba(0,240,255,.55);background:linear-gradient(135deg,rgba(0,240,255,.07),rgba(3,5,8,.97) 55%) !important;box-shadow:0 0 14px rgba(0,240,255,.18),inset 0 0 14px rgba(0,240,255,.06)}
+        .sglow{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:1.5px;border-radius:9999px;overflow:hidden;flex:none}
+        .sglow::before{content:"";position:absolute;left:50%;top:50%;width:300%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,transparent 0 65%,#00F0FF 80%,#00FF66 90%,transparent 100%);animation:promoGlowSpin 3.5s linear infinite}
+        .sglow > *{position:relative;z-index:1}
+        .sglow-sq{border-radius:5px}
+        .hdr-bal{border-radius:4px !important;padding:1px 6px !important;font-size:9px !important;background:#030508 !important}
+        .hdr-bal svg{width:11px !important;height:11px !important}
+        .promo-glow-wrap{position:relative;border-radius:8px;padding:1.5px;overflow:hidden;margin-bottom:12px;max-width:420px;margin-left:auto;margin-right:auto}
+        .promo-glow-wrap::before{content:"";position:absolute;left:50%;top:50%;width:220%;aspect-ratio:1;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,transparent 0 65%,#00F0FF 80%,#00FF66 90%,transparent 100%);animation:promoGlowSpin 3.5s linear infinite}
+        .promo-glow-wrap::after{content:"";position:absolute;inset:0;border-radius:8px;box-shadow:0 0 18px rgba(0,240,255,.35);pointer-events:none}
+        @keyframes promoGlowSpin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+        .promo-glow-wrap .promo-card{position:relative;z-index:1;margin:0 !important;max-width:none !important}
+        .promo-card::after{content:"";position:absolute;inset:3px;pointer-events:none;border-radius:2px;
+            background:
+              linear-gradient(#00F0FF,#00F0FF) top left/12px 2px no-repeat,
+              linear-gradient(#00F0FF,#00F0FF) top left/2px 12px no-repeat,
+              linear-gradient(#00F0FF,#00F0FF) top right/12px 2px no-repeat,
+              linear-gradient(#00F0FF,#00F0FF) top right/2px 12px no-repeat,
+              linear-gradient(#00FF66,#00FF66) bottom left/12px 2px no-repeat,
+              linear-gradient(#00FF66,#00FF66) bottom left/2px 12px no-repeat,
+              linear-gradient(#00FF66,#00FF66) bottom right/12px 2px no-repeat,
+              linear-gradient(#00FF66,#00FF66) bottom right/2px 12px no-repeat}
+        .promo-card .promo-ico{width:24px;height:24px;border-radius:4px}
+        .promo-card input{border-radius:4px !important}
+        .promo-card .promo-bal{border-radius:4px !important}
+        .promo-card .promo-apply{padding:6px 12px;font-size:11px;border-radius:4px}
+        .promo-card .promo-bal{padding:2px 8px;font-size:10px}
+        /* extra-compact promo box */
+        .promo-mini{padding:6px 8px !important;max-width:420px;margin-left:auto;margin-right:auto}
+        .promo-mini > div:first-child{margin-bottom:4px !important}
+        .promo-mini h3{font-size:9px !important}
+        .promo-mini .promo-ico{width:18px !important;height:18px !important;border-radius:3px !important}
+        .promo-mini .promo-ico svg{width:11px !important;height:11px !important}
+        .promo-mini input{padding:4px 8px !important;font-size:10px !important}
+        .promo-mini .promo-apply{padding:4px 9px !important;font-size:10px !important;gap:4px}
+        .promo-mini .promo-apply svg{width:10px !important;height:10px !important}
+        .promo-mini .promo-bal{padding:1px 6px !important;font-size:9px !important}
+        .promo-mini p{margin-top:3px !important}
+        /* unique login */
+        #authGateOverlay{background:radial-gradient(circle at 50% 20%,rgba(0,240,255,.12),transparent 55%),#02040a;overflow:hidden}
+        #authGateOverlay::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(0,240,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.07) 1px,transparent 1px);background-size:34px 34px;animation:gridMove 12s linear infinite;pointer-events:none}
+        @keyframes gridMove{to{background-position:34px 34px}}
+        .auth-card{position:relative;z-index:1;backdrop-filter:blur(6px);box-shadow:0 0 40px rgba(0,240,255,.3),inset 0 0 30px rgba(0,255,102,.05)!important}
+        .auth-card::after{content:"";position:absolute;left:0;right:0;height:2px;top:0;background:linear-gradient(90deg,transparent,#00FF66,#00F0FF,transparent);animation:scanLine 3.2s ease-in-out infinite;pointer-events:none}
+        @keyframes scanLine{0%{top:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+        .auth-ring{width:68px;height:68px;margin:0 auto 8px;border-radius:50%;padding:3px;background:conic-gradient(#00F0FF,#00FF66,#FFD700,#00F0FF);animation:spin 5s linear infinite;box-shadow:0 0 22px rgba(0,240,255,.6)}
+        .auth-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover;background:#000;display:block}
+</style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-xs">
+    <!-- Boot cover: hides home/login until the saved session is checked in the background -->
+    <div id="bootCover" style="position:fixed;top:0;right:0;bottom:0;left:0;z-index:200000;background:#000;transition:opacity .2s ease;"></div>
+
+
+    <audio id="bgAudio" loop preload="auto"></audio>
+
+    <!-- Auth Gate (Login / Sign up / Forgot Password) — hidden by default; shown only when really needed -->
+    <div id="authGateOverlay" class="hidden">
+        <div class="cyber-card auth-card rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border-2 border-cyan-400">
+            <div class="p-4 border-b border-brand-border bg-brand-dark text-center">
+                <div class="auth-ring"><img src="https://i.postimg.cc/FfXPJgLc/1791802319594.jpg" alt="BNX" width="62" height="62"></div>
+                <h3 class="text-sm font-black text-cyan-400 uppercase tracking-widest hacker-glow">BNX FF SHOP</h3>
+                <p class="text-[10px] text-brand-hacker font-code mt-1">&gt; SECURE ACCESS // চালিয়ে যেতে লগ ইন করুন_</p>
+            </div>
+
+            <!-- Login / Signup panel -->
+            <div id="authMainPanel" class="p-5 space-y-3">
+                <div class="flex bg-black rounded-full p-1 border border-brand-border">
+                    <button id="authTabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-full text-xs font-bold text-black bg-cyan-400">লগ ইন</button>
+                    <button id="authTabSignup" onclick="switchAuthTab('signup')" class="flex-1 py-2 rounded-full text-xs font-bold text-gray-300">সাইন আপ</button>
+                </div>
+
+                <div id="authErrorBox" class="hidden text-[11px] text-red-400 bg-red-950/50 border border-red-500/40 rounded-xl p-2 text-center"></div>
+
+                <div class="relative">
+                    <i class="fas fa-user-astronaut absolute left-3.5 top-3 text-cyan-500/70"></i>
+                    <input type="text" id="authUsernameInput" placeholder="ইউজারনেম" class="w-full pl-9 pr-3.5 py-2.5 bg-black border border-brand-border rounded-xl text-xs text-white hidden">
+                </div>
+                <div class="relative">
+                    <i class="fas fa-envelope absolute left-3.5 top-3 text-cyan-500/70"></i>
+                    <input type="email" id="authEmailInput" placeholder="Gmail / Email" class="w-full pl-9 pr-3.5 py-2.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                </div>
+                <div class="relative">
+                    <i class="fas fa-lock absolute left-3.5 top-3 text-cyan-500/70"></i>
+                    <input type="password" id="authPasswordInput" oninput="updatePwStrength()" placeholder="পাসওয়ার্ড" class="w-full pl-9 pr-9 py-2.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                    <button type="button" onclick="toggleAuthPassVisibility()" class="absolute right-3 top-2.5 text-gray-500"><i id="authPassEye" class="fas fa-eye"></i></button>
+                </div>
+
+                <div id="pwStrengthWrap" class="hidden space-y-1">
+                    <div class="w-full h-1 bg-brand-border rounded-full overflow-hidden"><div id="pwStrengthBar" class="bg-red-500"></div></div>
+                    <p id="pwStrengthLabel" class="text-[10px] text-gray-400 font-code">পাসওয়ার্ড শক্তি: দুর্বল</p>
+                </div>
+
+                <button id="authSubmitBtn" onclick="submitAuthForm()" class="w-full py-3 stylish-btn text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fas fa-fingerprint"></i><span>লগ ইন করুন</span>
+                </button>
+
+                <button type="button" onclick="showForgotPassPanel()" id="forgotPassLink" class="w-full text-center text-[11px] text-cyan-400 hover:text-cyan-300 font-bold underline underline-offset-2">পাসওয়ার্ড ভুলে গেছেন?</button>
+            </div>
+
+            <!-- Forgot password panel -->
+            <div id="authForgotPanel" class="p-5 space-y-3 hidden">
+                <div class="matrix-terminal p-3 rounded-xl text-[11px] text-brand-hacker font-code">
+                    <i class="fas fa-key mr-1"></i> আপনার Gmail দিন, রিসেট লিংক পাঠানো হবে।
+                </div>
+                <div id="forgotErrorBox" class="hidden text-[11px] text-red-400 bg-red-950/50 border border-red-500/40 rounded-xl p-2 text-center"></div>
+                <div id="forgotSuccessBox" class="hidden text-[11px] text-emerald-400 bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-2 text-center"></div>
+                <div class="relative">
+                    <i class="fas fa-envelope absolute left-3.5 top-3 text-cyan-500/70"></i>
+                    <input type="email" id="forgotEmailInput" placeholder="আপনার Gmail দিন" class="w-full pl-9 pr-3.5 py-2.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                </div>
+                <button onclick="submitForgotPassword()" id="forgotSubmitBtn" class="w-full py-3 stylish-btn text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fas fa-paper-plane"></i><span>রিসেট লিংক পাঠান</span>
+                </button>
+                <button type="button" onclick="hideForgotPassPanel()" class="w-full text-center text-[11px] text-gray-400 hover:text-white font-bold">
+                    <i class="fas fa-arrow-left mr-1"></i> লগ ইনে ফিরে যান
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ban Screen -->
+    <div id="banScreenOverlay" class="hidden">
+        <div class="block-card">
+            <div class="block-icon">🚫</div>
+            <h3>আপনার অ্যাকাউন্ট ব্যান করা হয়েছে</h3>
+            <p id="banReasonText">নিয়ম ভঙ্গের কারণে আপনাকে ব্লক করা হয়েছে। বিস্তারিত জানতে অ্যাডমিনের সাথে যোগাযোগ করুন।</p>
+            <button onclick="doLogout()">লগ আউট করুন</button>
+        </div>
+    </div>
+
+    <!-- Offline Blocker Popup -->
+    <div id="offlineOverlay" class="hidden">
+        <div class="offline-card">
+            <div class="offline-icon">📡</div>
+            <h3>ইন্টারনেট সংযোগ নেই!</h3>
+            <p>অফলাইনে ব্যবহার করা যায় না। অনলাইনে গিয়ে আবার ট্রাই করুন।</p>
+            <button onclick="retryConnection()">আবার চেষ্টা করুন</button>
+        </div>
+    </div>
+    <script>
+        // Runs immediately: offline => popup right away (no loading / login screen).
+        // Online + no earlier session on this device => show login. Returning users: no login flash.
+        window.__startedOffline = !navigator.onLine;
+        window.hideBootCover = function() {
+            var c = document.getElementById('bootCover');
+            if (!c) { setTimeout(window.hideBootCover, 50); return; }
+            if (c.dataset.gone) return;
+            c.dataset.gone = '1';
+            c.style.opacity = '0';
+            setTimeout(function(){ c.style.display = 'none'; }, 220);
+        };
+        if (!navigator.onLine) {
+            document.getElementById('offlineOverlay').classList.remove('hidden');
+            window.hideBootCover();
+        } else if (localStorage.getItem('ff_had_session') !== '1' && !Object.keys(localStorage).some(function(k){return k.indexOf('firebase:authUser:')===0;})) {
+            document.getElementById('authGateOverlay').classList.remove('hidden');
+            window.hideBootCover();
+        }
+        // Safety: never leave the cover stuck (e.g. slow network)
+        setTimeout(function(){ window.hideBootCover(); }, 8000);
+    </script>
+
+    <!-- Intro Loading Screen (hidden by default; shown only on first entry after login) -->
+    <div id="introLoadingScreen" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center overflow-hidden" style="display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;background:#000;transition:opacity 0.5s ease;">
+        <div class="relative w-full h-full flex items-center justify-center">
+            <div class="w-full h-full flex flex-col items-center justify-center space-y-4">
+                <div class="relative w-32 h-32 flex items-center justify-center mb-2">
+                    <div class="absolute inset-0 rounded-full border-4 border-dashed border-cyan-400 animate-spin"></div>
+                    <div class="w-28 h-28 rounded-full border-2 border-emerald-400 p-1 shadow-[0_0_30px_rgba(0,240,255,0.7)] bg-black overflow-hidden rotating-logo">
+                        <img src="https://i.postimg.cc/FfXPJgLc/1791802319594.jpg" alt="BNX Logo" class="w-full h-full object-cover rounded-full">
+                    </div>
+                </div>
+                <h2 class="text-xl font-black text-white tracking-widest uppercase">BNX FF CYBER SHOP</h2>
+                <p class="text-xs text-cyan-400 font-code hacker-glow animate-pulse">SYSTEM INITIALIZATION IN PROGRESS...</p>
+            </div>
+
+            <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 z-10 flex flex-col items-center space-y-3">
+                <button onclick="skipIntroVideo()" class="px-6 py-2.5 rounded-full bg-cyan-500 text-black font-black text-xs transition shadow-lg flex items-center space-x-1 hover:scale-105">
+                    <span>ENTER SHOP</span> <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Special Offer Modal -->
+    <div id="specialOfferModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative border-2 border-amber-400">
+            <div class="p-3 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 font-extrabold text-[11px] flex items-center">
+                    <i class="fas fa-fire mr-1 text-red-500 animate-pulse"></i> SPECIAL OFFER EVENT
+                </span>
+                <button onclick="closeSpecialOfferModal()" class="text-gray-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center bg-black">
+                <div class="w-full h-48 rounded-2xl overflow-hidden border border-amber-500/30 flex items-center justify-center bg-brand-dark">
+                    <img id="offerBannerImg" src="" onerror="this.src='https://i.postimg.cc/FfXPJgLc/1791802319594.jpg'" alt="Special Offer Banner" class="w-full h-full object-cover">
+                </div>
+                <div class="space-y-3">
+                    <h3 class="text-base font-extrabold text-amber-400 uppercase tracking-wide">SPECIAL EVENT DISCOUNT!</h3>
+                    <p id="offerTitleText" class="text-xs text-gray-300">Exclusive limited-time discount available for verified buyers. Grab now before stock ends!</p>
+                    <button onclick="openExternalLink('dealTg'); closeSpecialOfferModal();" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-red-500 text-black font-black text-xs shadow-lg hover:scale-105 transition flex items-center justify-center space-x-1">
+                        <i class="fas fa-bolt"></i><span>Grab Offer</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buy Details & Promo Refund Modal -->
+    <div id="buyModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative border-2 border-cyan-400">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <h3 class="text-xs font-black text-cyan-400 tracking-wider uppercase flex items-center">
+                    <i class="fas fa-shield-check mr-2 text-brand-hacker text-base"></i> ACCOUNT PURCHASE & PROMO INFO
+                </h3>
+                <button onclick="closeBuyModal()" class="text-gray-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="hightech-box p-3.5 rounded-2xl space-y-1.5 text-[11px]">
+                    <div id="refundInfo" class="text-gray-300 space-y-0.5"></div>
+                    <button onclick="applyPromoRefund()" class="w-full mt-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-red-500 text-black font-black text-xs shadow-lg flex items-center justify-center"><svg class="pi" style="margin-right:4px" viewBox="0 0 24 24" fill="#000"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Promo Code to Refund</span></button>
+                    <p id="refundMsg" class="text-[10px] font-bold hidden"></p>
+                </div>
+
+                <div class="hightech-box p-3.5 rounded-2xl space-y-2 text-[11px]">
+                    <div class="flex items-center justify-between"><span class="font-bold text-cyan-400">⭐ রিভিউ ও রেটিং</span><span id="reviewAvg" class="text-amber-300 font-bold"></span></div>
+                    <div id="reviewList" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
+                    <div id="reviewStars" class="flex items-center gap-1"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="reviewText" maxlength="200" placeholder="আপনার মতামত লিখুন..." class="flex-1 px-2.5 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                        <button onclick="submitReview()" class="px-3 py-1.5 rounded-xl bg-cyan-500 text-black font-black text-xs">Submit</button>
+                    </div>
+                    <p id="reviewMsg" class="text-[10px] font-bold hidden"></p>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                    <p class="text-gray-300 font-bold">ক্রয় করার নিয়মাবলি:</p>
+                    <p class="text-gray-400 leading-relaxed text-[11px]">নিচের অ্যাডমিন বাটনে ক্লিক করে সরাসরি যোগাযোগ করুন। পেমেন্ট সম্পন্ন করার পর একাউন্ট ইউআইডি ও পাসওয়ার্ড সুরক্ষিতভাবে হস্তান্তর করা হবে।</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <button onclick="openExternalLink('mainTg')" class="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center justify-center space-x-1 shadow">
+                        <i class="fab fa-telegram"></i><span>Main Admin</span>
+                    </button>
+                    <button onclick="openExternalLink('coTg')" class="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center justify-center space-x-1 shadow">
+                        <i class="fab fa-telegram-plane"></i><span>Co-Admin</span>
+                    </button>
+                </div>
+                <button onclick="confirmPurchaseAction()" class="w-full py-3 stylish-btn text-black font-black text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fab fa-telegram-plane text-sm"></i><span>Contact Deal Admin</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UID Profile Lookup Modal -->
+    <div id="uidLookupModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative border-2 border-cyan-400">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <h3 class="text-xs font-black text-cyan-400 tracking-wider uppercase flex items-center">
+                    <i class="fas fa-id-card-clip mr-2 text-brand-hacker text-base"></i> FREE FIRE UID PROFILE SEARCH & CHECKER
+                </h3>
+                <button onclick="closeUidLookupModal()" class="text-gray-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="flex items-center space-x-2">
+                    <div class="relative flex-1">
+                        <i class="fas fa-crosshairs absolute left-3.5 top-3 text-cyan-400"></i>
+                        <input type="text" id="uidSearchInput" placeholder="Enter Free Fire UID..." class="w-full pl-9 pr-4 py-2.5 bg-black border border-brand-border rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 font-code">
+                    </div>
+                    <button id="uidApiSearchBtn" onclick="executeUidLookup()" class="px-5 py-2.5 stylish-btn text-black font-black rounded-xl text-xs shadow-lg flex items-center space-x-1">
+                        <i class="fas fa-search"></i><span>Search</span>
+                    </button>
+                </div>
+
+                <div id="uidOptionsBox" class="hightech-box p-4 rounded-2xl space-y-3">
+                    <p class="text-[11px] text-cyan-300 font-code font-bold text-center">CHOOSE ACTION MODE:</p>
+                    <div class="grid grid-cols-1 gap-3">
+                        <button onclick="proceedUidDetails()" class="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center justify-center space-x-1 shadow">
+                            <i class="fas fa-info-circle"></i><span>Details (TG Filter Service)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="uidSearchResultBox" class="hidden hightech-box p-4 rounded-2xl space-y-3 font-code">
+                    <div class="flex items-center justify-between border-b border-brand-border/60 pb-2">
+                        <span class="text-cyan-400 font-bold text-xs"><i class="fas fa-user-shield text-emerald-400 mr-1"></i> LIVE API PLAYER PROFILE</span>
+                        <span id="uidResultServer" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">BD Server</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="bg-black/60 p-2.5 rounded-xl border border-brand-border">
+                            <p class="text-gray-400 text-[10px]">Nickname</p>
+                            <p id="uidResultName" class="font-extrabold text-white truncate text-xs">BNX_PLAYER</p>
+                        </div>
+                        <div class="bg-black/60 p-2.5 rounded-xl border border-brand-border">
+                            <p class="text-gray-400 text-[10px]">UID Number</p>
+                            <p id="uidResultUid" class="font-bold text-cyan-300 text-xs">1928374650</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-40 bg-brand-card/95 backdrop-blur-md border-b border-brand-border shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
+
+            <div class="flex items-center justify-between w-full md:w-auto gap-3">
+                <div class="flex items-center space-x-2.5">
+                    <div id="adminLogo" ondblclick="openAdminSecurityModal('admin')" title="Double tap to open Admin Panel" class="w-10 h-10 rounded-full overflow-hidden border border-cyan-400/50 shadow-lg flex items-center justify-center bg-black cursor-pointer">
+                        <img src="https://i.postimg.cc/FfXPJgLc/1791802319594.jpg" alt="BNX Logo" width="40" height="40" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <h1 class="text-sm sm:text-base font-black bg-gradient-to-r from-cyan-400 via-emerald-300 to-emerald-500 bg-clip-text text-transparent tracking-wider">
+                            BNX FF SHOP
+                        </h1>
+                        <p class="text-[10px] text-cyan-400/80 font-bold tracking-widest uppercase">Cyber Hacker Market</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-1.5 bg-brand-dark/80 px-2.5 py-1 rounded-full border border-brand-border">
+                    <span class="sglow sglow-sq"><span class="js-promo-bal hdr-bal px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold font-code"></span></span>
+                    <span class="sglow"><button onclick="openExternalLink('tiktok')" title="TikTok" class="sbtn w-7 h-7 rounded-full bg-slate-800 hover:bg-black text-white flex items-center justify-center text-xs transition border border-gray-700 cursor-pointer">
+                        <i class="fab fa-tiktok"></i>
+                    </button></span>
+                    <span class="sglow"><button onclick="openExternalLink('youtube')" title="YouTube" class="sbtn w-7 h-7 rounded-full bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center text-xs transition border border-red-500/40 cursor-pointer">
+                        <i class="fab fa-youtube"></i>
+                    </button></span>
+                    <span class="sglow"><button onclick="openExternalLink('instagram')" title="Instagram" class="sbtn w-7 h-7 rounded-full bg-pink-600/20 hover:bg-pink-600 text-pink-400 hover:text-white flex items-center justify-center text-xs transition border border-pink-500/40 cursor-pointer">
+                        <i class="fab fa-instagram"></i>
+                    </button></span>
+                    <span class="sglow"><button onclick="openExternalLink('whatsapp')" title="WhatsApp" class="sbtn w-7 h-7 rounded-full bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white flex items-center justify-center text-xs transition border border-emerald-500/40 cursor-pointer">
+                        <i class="fab fa-whatsapp"></i>
+                    </button></span>
+                    <button id="logoutBtn" onclick="confirmLogout()" title="Log out" class="hidden w-7 h-7 rounded-full bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white flex items-center justify-center text-xs transition border border-red-500/40 cursor-pointer">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <nav class="flex items-center space-x-1 bg-brand-dark p-1 rounded-full border border-brand-border text-xs overflow-x-auto max-w-full">
+                <button onclick="switchTab('all')" id="tab-all" class="px-3.5 py-1.5 rounded-full font-bold text-cyan-400 bg-brand-border/60 transition shadow">All Accounts</button>
+                <button onclick="switchTab('rare')" id="tab-rare" class="px-3.5 py-1.5 rounded-full font-bold text-gray-300 hover:text-white transition">Rare Bundles</button>
+                <button onclick="switchTab('max')" id="tab-max" class="px-3.5 py-1.5 rounded-full font-bold text-gray-300 hover:text-white transition">Level 75+</button>
+                <button onclick="switchTab('budget')" id="tab-budget" class="px-3.5 py-1.5 rounded-full font-bold text-gray-300 hover:text-white transition">Budget Collection</button>
+                <button onclick="switchTab('wish')" id="tab-wish" class="px-3.5 py-1.5 rounded-full font-bold text-gray-300 hover:text-white transition"><i class="fas fa-heart text-red-400 mr-1"></i>Saved</button>
+            </nav>
+
+            <div class="flex items-center flex-wrap justify-center gap-2">
+                <button onclick="openExternalLink('mainTg')" class="px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold shadow flex items-center space-x-1 transition text-xs">
+                    <i class="fab fa-telegram"></i><span>BNX FF Admin</span>
+                </button>
+
+                <button onclick="openExternalLink('coTg')" class="px-3 py-1.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-bold shadow flex items-center space-x-1 transition text-xs">
+                    <i class="fab fa-telegram-plane"></i><span>Co-Admin</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Banner -->
+    <section class="relative bg-gradient-to-b from-brand-card/80 to-brand-dark border-b border-brand-border py-8 px-4">
+        <div class="max-w-3xl mx-auto text-center">
+            <span class="inline-block px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 text-[11px] font-bold mb-3 shadow">
+                <i class="fas fa-terminal mr-1 text-brand-hacker"></i> LIVE CYBER ENCRYPTED TERMINAL
+            </span>
+
+            <div class="matrix-terminal rounded-2xl p-4 mb-5 text-left font-code text-xs text-brand-hacker overflow-hidden relative">
+                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-hacker via-cyan-400 to-blue-500 animate-pulse"></div>
+                <div id="hackerTerminalText" class="h-12 flex items-center hacker-glow font-bold">
+                    Initializing secure cyber mainframe...
+                </div>
+            </div>
+
+            <h2 class="text-xl sm:text-3xl font-extrabold text-white mb-2">
+                BNX FF SHOP — Free Fire Account Marketplace
+            </h2>
+
+            <div class="flex flex-wrap justify-center gap-3 mt-4">
+                <button onclick="openExternalLink('dealTg')" class="stylish-btn px-6 py-2.5 rounded-full text-black font-extrabold flex items-center space-x-2 shadow-xl text-xs">
+                    <i class="fab fa-telegram-plane"></i>
+                    <span>Admin To Deal</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <div id="alertBox" class="hidden mb-5 p-3 rounded-2xl border flex items-center justify-between text-xs transition-all shadow-xl">
+            <span id="alertMessage"></span>
+            <button onclick="hideAlert()" class="ml-3 font-bold text-base">&times;</button>
+        </div>
+
+        <!-- Limited-time offer countdown -->
+        <div id="offerCountdown" class="hidden mb-4 rounded-2xl border border-amber-500/50 bg-gradient-to-r from-amber-500/10 to-red-500/10 px-3 py-2 flex items-center justify-between">
+            <span id="offerCdTitle" class="text-[11px] font-bold text-amber-300 truncate pr-2"></span>
+            <span id="offerCdTime" class="font-code text-sm text-amber-400 whitespace-nowrap"></span>
+        </div>
+
+        <!-- Promo Code (paste code => balance shows on top) -->
+        <div class="promo-glow-wrap">
+        <div class="cyber-card promo-card promo-mini shadow-xl">
+            <div class="flex items-center justify-between mb-1.5">
+                <h3 class="text-[10px] font-bold text-cyan-400 flex items-center gap-2"><span class="promo-ico"><svg class="pi" viewBox="0 0 24 24" fill="none" stroke="#00F0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 0 0 6v3h18v-3a2 2 0 0 1 0-6V6H3z"/><path d="M13 6v12" stroke-dasharray="2 2"/></svg></span> PROMO CODE</h3>
+                <span class="js-promo-bal promo-bal"></span>
+            </div>
+            <div class="flex space-x-2">
+                <input type="text" id="promoPasteInput" placeholder="প্রোমো কোড পেস্ট করুন..." class="flex-1 px-2.5 py-1.5 bg-black border border-cyan-500/40 rounded-xl text-xs text-white uppercase font-code focus:outline-none focus:border-brand-hacker">
+                <button onclick="redeemPromoCode()" class="promo-apply"><svg class="pi" viewBox="0 0 24 24" fill="#000"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Apply</span></button>
+            </div>
+            <p id="promoMsg" class="text-[10px] font-bold mt-1.5 hidden"></p>
+        </div>
+        </div>
+
+        <div class="cyber-card rounded-3xl p-4 mb-6 shadow-xl">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3.5 top-3 text-gray-400"></i>
+                    <input type="text" id="searchInput" oninput="renderListings()" placeholder="Search Bundles or UID..."
+                        class="w-full pl-9 pr-3 py-2 bg-brand-dark border border-brand-border rounded-full text-xs text-white placeholder-gray-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <select id="levelFilter" onchange="renderListings()" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-full text-xs text-gray-300 focus:outline-none">
+                        <option value="all">All Levels</option>
+                        <option value="70">Level 70+</option>
+                        <option value="75">Level 75+</option>
+                        <option value="80">Level 80+</option>
+                    </select>
+                </div>
+
+                <div>
+                    <select id="serverFilter" onchange="renderListings()" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-full text-xs text-gray-300 focus:outline-none">
+                        <option value="all">All Servers</option>
+                        <option value="BD">BD Server</option>
+                        <option value="India">India Server</option>
+                    </select>
+                </div>
+
+                <div>
+                    <select id="priceFilter" onchange="renderListings()" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-full text-xs text-gray-300 focus:outline-none">
+                        <option value="all">All Price Ranges</option>
+                        <option value="under2000">Under ৳ 2000</option>
+                        <option value="2000-5000">৳ 2000 - ৳ 5000</option>
+                    </select>
+                </div>
+
+                <button onclick="openUidLookupModal()" class="w-full py-2.5 bg-brand-dark hover:bg-brand-border text-brand-hacker font-extrabold rounded-full text-xs shadow-lg border border-brand-hacker/60 transition">
+                    <i class="fas fa-id-card-clip text-sm"></i> UID Search
+                </button>
+
+                <button id="addAccountBtn" onclick="openAdminSecurityModal('add_video')" class="hidden w-full py-2.5 stylish-btn text-black font-extrabold rounded-full text-xs shadow-lg border border-cyan-300">
+                    <i class="fas fa-plus-circle text-sm"></i> Add Account
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-extrabold text-white flex items-center">
+                <i class="fas fa-shield-alt text-cyan-400 mr-2"></i> Verified Account Listings
+            </h3>
+            <span id="listingCount" class="text-[11px] bg-brand-border px-3 py-1 rounded-full text-cyan-400 font-bold shadow">Loading...</span>
+        </div>
+
+        <div id="listingsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+    </main>
+
+    <!-- Admin Hacker Security Gateway Modal (admin account only, no password inside the page) -->
+    <div id="adminSecurityModal" class="fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative border-2 border-brand-hacker animate-pulse">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-black">
+                <h3 class="text-xs font-black text-brand-hacker tracking-wider uppercase flex items-center hacker-glow">
+                    <i class="fas fa-terminal mr-2 text-brand-hacker text-base"></i> SECURE GATEWAY // ENCRYPTION CHECK
+                </h3>
+                <button onclick="closeAdminSecurityModal()" class="text-brand-hacker hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div class="p-6 space-y-5 text-center bg-black/95">
+                <div class="matrix-terminal p-4 rounded-2xl space-y-3 font-code text-[11px] text-brand-hacker text-left">
+                    <p class="animate-pulse">> [SYSTEM] ACCESS ATTEMPT DETECTED...</p>
+                    <p>> [SECURITY] HUMAN VERIFICATION REQUIRED.</p>
+                    <div onclick="toggleHumanVerification()" id="humanVerifyBox" class="bg-black border border-brand-hacker hover:border-cyan-400 p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                        <div class="flex items-center space-x-3">
+                            <div id="verifyCheckboxIndicator" class="w-6 h-6 rounded border-2 border-brand-hacker flex items-center justify-center bg-black">
+                                <i id="verifyCheckIcon" class="fas fa-check text-brand-hacker text-xs hidden"></i>
+                            </div>
+                            <span class="text-xs font-bold text-brand-hacker font-code">I am not a robot [AUTHORIZED]</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="verifyAndOpenAdmin()" class="w-full py-3 rounded-xl bg-brand-hacker text-black font-black text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(0,255,102,0.6)] hover:scale-105 transition">
+                    UNLOCK MAINFRAME
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Admin Dashboard Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <h3 class="text-sm font-bold text-amber-400 flex items-center">
+                    <i class="fas fa-user-lock mr-2"></i> ADMIN CONTROL & LIVE ACTIVITY HISTORY LOG
+                </h3>
+                <button onclick="closeAdminModal()" class="text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+
+            <div class="p-5 space-y-5 overflow-y-auto">
+
+                <!-- Promo Code Settings -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-cyan-500/50">
+                    <h4 class="text-xs font-bold text-cyan-400"><i class="fas fa-tag mr-1.5"></i> Promo Code Settings</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="pmCode" placeholder="Promo Code" class="px-3 py-2 bg-black border border-brand-border rounded-xl text-xs text-white font-code">
+                        <input type="number" id="pmBalance" placeholder="Balance given by code" class="px-3 py-2 bg-black border border-brand-border rounded-xl text-xs text-white font-code">
+                        <input type="number" id="pmCost" placeholder="Promo taken per refund" class="px-3 py-2 bg-black border border-brand-border rounded-xl text-xs text-white font-code">
+                        <input type="number" id="pmDiscount" placeholder="Discount ৳ per refund" class="px-3 py-2 bg-black border border-brand-border rounded-xl text-xs text-white font-code">
+                    </div>
+                    <label class="flex items-center space-x-2 text-[10px] text-gray-300"><input type="checkbox" id="pmAll" class="w-4 h-4 accent-cyan-400"><span>সব ব্যালেন্স একবারে নিবে (ডিসকাউন্ট = ব্যালেন্স × ডিসকাউন্ট ÷ প্রোমো কস্ট)</span></label>
+                </div>
+
+                <!-- UID Filter Telegram Link Settings -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-emerald-500/50">
+                    <h4 class="text-xs font-bold text-emerald-400"><i class="fas fa-id-card mr-1.5"></i> UID Filter Telegram Service Link</h4>
+                    <div class="flex space-x-2">
+                        <input type="url" id="adminUidFilterTgInput" placeholder="Telegram Link for UID Filter Service..." class="flex-1 px-3.5 py-2 bg-black border border-brand-border rounded-xl text-xs text-white">
+                        <button onclick="clearField('adminUidFilterTgInput')" title="Clear Link" class="px-3 bg-red-900/60 hover:bg-red-700 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+
+                <!-- Background Audio Customization -->
+                <div class="space-y-3 bg-brand-dark/90 p-3.5 rounded-2xl border border-cyan-500/50">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-cyan-400"><i class="fas fa-music mr-1.5"></i> Background Audio Customization</h4>
+                        <label class="flex items-center space-x-2">
+                            <span class="text-[10px] text-gray-300">Audio ON/OFF:</span>
+                            <input type="checkbox" id="adminAudioStatus" class="w-4 h-4 accent-cyan-400">
+                        </label>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input type="url" id="adminAudioUrlInput" placeholder="Direct audio link (mp3 / ogg / wav)..." class="flex-1 px-3.5 py-2 bg-black border border-brand-border rounded-xl text-xs text-white">
+                        <button onclick="clearField('adminAudioUrlInput')" title="Clear Audio Link" class="px-3 bg-red-900/60 hover:bg-red-700 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[10px] text-gray-300"><i class="fas fa-volume-up text-cyan-400 mr-1"></i> Volume (drag to adjust)</label>
+                            <span id="adminAudioVolumeLabel" class="text-[10px] text-cyan-400 font-code font-bold">50%</span>
+                        </div>
+                        <input type="range" id="adminAudioVolume" min="0" max="100" step="1" value="50" oninput="onAdminVolumeInput(this.value)" class="w-full accent-cyan-400" style="width:100%;">
+                    </div>
+                </div>
+
+                <!-- Background Cover Photo Settings -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-brand-border">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-cyan-400"><i class="fas fa-image mr-1.5"></i> Background Cover Photo Settings</h4>
+                        <button onclick="clearBgPhoto()" class="px-3 py-1 bg-red-950 text-red-300 rounded-full text-[10px] border border-red-500/40"><i class="fas fa-trash-alt mr-1"></i> Remove Cover Photo</button>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input type="url" id="adminBgPhotoUrlInput" placeholder="Enter photo URL..." class="flex-1 px-3.5 py-2 bg-black border border-brand-border rounded-xl text-xs text-white">
+                        <button onclick="clearField('adminBgPhotoUrlInput')" title="Clear URL" class="px-3 bg-red-900/60 hover:bg-red-700 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+
+                <!-- Quick Add Account Video -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-cyan-500/40">
+                    <h4 class="text-xs font-bold text-cyan-400"><i class="fas fa-video mr-1.5"></i> Quick Add Account Video</h4>
+                    <button onclick="closeAdminModal(); openAddListingModalDirect();" class="px-4 py-2 stylish-btn text-black font-extrabold rounded-full text-xs flex items-center space-x-1.5">
+                        <i class="fas fa-plus-circle"></i><span>Open Add Listing Form</span>
+                    </button>
+                </div>
+
+                <!-- Special Offer Banner Thumbnail Settings -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-amber-500/50">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-bold text-amber-400"><i class="fas fa-fire mr-1.5"></i> Special Offer Banner Thumbnail Settings</h4>
+                        <label class="flex items-center space-x-2">
+                            <span class="text-[10px] text-gray-300">Enable Offer Popup:</span>
+                            <input type="checkbox" id="adminOfferStatus" class="w-4 h-4 accent-amber-400">
+                        </label>
+                    </div>
+                    <input type="text" id="adminOfferTitleInput" placeholder="Offer Title Note" class="w-full px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white mb-2">
+                    <label class="block text-[10px] text-gray-300 mb-1">Offer Countdown শেষ হওয়ার সময় (খালি রাখলে কাউন্টডাউন বন্ধ):</label>
+                    <input type="datetime-local" id="adminOfferEndInput" class="w-full px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white mb-2">
+                    <div class="flex space-x-2">
+                        <input type="url" id="adminOfferImgUrlInput" placeholder="Direct thumbnail image URL..." class="flex-1 px-3.5 py-2 bg-black border border-brand-border rounded-xl text-xs text-white">
+                        <button onclick="clearField('adminOfferImgUrlInput')" title="Clear Link" class="px-3 bg-red-900/60 hover:bg-red-700 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+
+                <!-- Telegram & Social Links Settings -->
+                <div class="space-y-3 bg-brand-dark/90 p-4 rounded-2xl border border-cyan-500/40">
+                    <h4 class="text-xs font-bold text-cyan-400 border-b border-brand-border pb-1">
+                        <i class="fas fa-share-alt mr-1.5"></i> Telegram & Social Links Settings
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fas fa-handshake text-amber-400"></i> Admin To Deal</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminDealTgInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminDealTgInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-telegram text-blue-400"></i> Main Admin Telegram</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminMainTgInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminMainTgInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-telegram-plane text-purple-400"></i> Co-Admin Telegram</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminCoTgInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminCoTgInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-tiktok text-white"></i> TikTok Link</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminTiktokInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminTiktokInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-youtube text-red-500"></i> YouTube Link</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminYoutubeInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminYoutubeInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-instagram text-pink-500"></i> Instagram Link</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminInstagramInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminInstagramInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-span-full">
+                            <label class="block text-[10px] text-gray-300 mb-1"><i class="fab fa-whatsapp text-emerald-400"></i> WhatsApp Link</label>
+                            <div class="flex space-x-1">
+                                <input type="url" id="adminWhatsappInput" class="flex-1 px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                                <button onclick="clearField('adminWhatsappInput')" class="px-2.5 bg-red-900/60 text-red-300 rounded-xl"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Management (Ban / Unban + Tracking, Admin-only view) -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-red-500/40">
+                    <div class="flex items-center justify-between border-b border-brand-border pb-1">
+                        <h4 class="text-xs font-bold text-red-400"><i class="fas fa-user-slash mr-1"></i> ইউজার ম্যানেজমেন্ট ও অ্যাক্টিভিটি ট্র্যাকিং</h4>
+                        <button onclick="loadUserManagementList()" class="px-3 py-0.5 bg-cyan-950 text-cyan-300 rounded-full text-[10px] border border-cyan-500/40">রিফ্রেশ</button>
+                    </div>
+                    <p class="text-[10px] text-gray-500">এই সব তথ্য শুধু আপনি (অ্যাডমিন) দেখতে পাচ্ছেন। ইউজাররা তাদের নিজেদের ট্র্যাকিং ডেটা কখনো দেখতে পারবে না।</p>
+                    <input type="text" id="userMgmtSearch" oninput="renderUserManagementList()" placeholder="ইউজারনেম বা ইমেইল সার্চ করুন..." class="w-full px-3 py-1.5 bg-black border border-brand-border rounded-xl text-xs text-white">
+                    <div id="userMgmtListContainer" class="max-h-64 overflow-y-auto space-y-2 text-[11px] font-code"></div>
+                </div>
+
+                <!-- Live Activity History Log -->
+                <div class="space-y-2 bg-brand-dark/90 p-3.5 rounded-2xl border border-emerald-500/40">
+                    <div class="flex items-center justify-between border-b border-brand-border pb-1">
+                        <h4 class="text-xs font-bold text-emerald-400"><i class="fas fa-history mr-1"></i> Live Activity History Log</h4>
+                        <button onclick="clearHistoryLog()" class="px-3 py-0.5 bg-red-950 text-red-300 rounded-full text-[10px] border border-red-500/40">Clear History</button>
+                    </div>
+                    <div id="historyLogContainer" class="max-h-40 overflow-y-auto space-y-1.5 text-[10px] font-code"></div>
+                </div>
+
+            </div>
+            <div class="p-4 border-t border-brand-border bg-brand-dark flex justify-end space-x-2">
+                <button onclick="closeAdminModal()" class="px-4 py-2 bg-gray-700 text-white rounded-full text-xs">Cancel</button>
+                <button onclick="saveAdminSettings()" class="px-5 py-2 bg-amber-500 text-black font-extrabold rounded-full text-xs shadow-lg">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Detail Modal (Admin-only) -->
+    <div id="userDetailModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-[60] flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border-2 border-cyan-400 max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <h3 class="text-xs font-black text-cyan-400 tracking-wider uppercase flex items-center">
+                    <i class="fas fa-user-shield mr-2"></i> ইউজার ডিটেইলস
+                </h3>
+                <button onclick="closeUserDetailModal()" class="text-gray-400 hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            <div id="userDetailBody" class="p-5 space-y-3 overflow-y-auto font-code text-xs"></div>
+            <div class="p-4 border-t border-brand-border bg-brand-dark">
+                <div class="space-y-2">
+                    <textarea id="userDetailBanReason" rows="2" placeholder="ব্যানের কারণ লিখুন (ইউজার এটা দেখতে পাবে)..." class="w-full px-3 py-2 bg-black border border-brand-border rounded-xl text-xs text-white"></textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="userDetailBanBtn" onclick="userDetailToggleBan(true)" class="py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs"><i class="fas fa-ban mr-1"></i> Ban করুন</button>
+                        <button id="userDetailUnbanBtn" onclick="userDetailToggleBan(false)" class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs"><i class="fas fa-check-circle mr-1"></i> Unblock করুন</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Add Listing Modal -->
+    <div id="addListingModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="cyber-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+            <div class="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark">
+                <h3 class="text-sm font-bold text-cyan-400 flex items-center">
+                    <i class="fas fa-plus-circle mr-2"></i> Add Account Listing
+                </h3>
+                <button onclick="closeAddListingModal()" class="text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-5 space-y-3 overflow-y-auto">
+                <input type="text" id="addUid" placeholder="Account UID" class="w-full px-3.5 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white font-code">
+                <input type="text" id="addTitle" placeholder="Title & Bundle Info" class="w-full px-3.5 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white">
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="number" id="addLevel" placeholder="Level" value="75" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white">
+                    <input type="number" id="addPrice" placeholder="Price (৳)" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white">
+                    <select id="addServer" class="w-full px-3 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white">
+                        <option value="BD">BD</option>
+                        <option value="India">India</option>
+                    </select>
+                </div>
+                <input type="url" id="addThumbnailUrlInput" placeholder="Thumbnail Image Link" class="w-full px-3.5 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white">
+                <textarea id="addDetails" rows="2" placeholder="Details..." class="w-full px-3.5 py-2 bg-brand-dark border border-brand-border rounded-xl text-xs text-white"></textarea>
+            </div>
+            <div class="p-4 border-t border-brand-border bg-brand-dark flex justify-end space-x-2">
+                <button onclick="closeAddListingModal()" class="px-4 py-2 bg-gray-700 text-white rounded-full text-xs">Cancel</button>
+                <button onclick="submitNewListing()" class="px-5 py-2 stylish-btn text-black font-extrabold rounded-full text-xs">Publish Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-brand-card border-t border-brand-border py-8 mt-10 text-center text-xs text-gray-400">
+        <p>© 2026 BNX FF SHOP. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // ---------- Security helpers ----------
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // ---------- ADMIN: put your admin account UID here ----------
+        // Firebase Console > Authentication > Users > "User UID". No password is stored in this page.
+        // Real protection is in Firebase Rules (same UID there).
+        const ADMIN_UIDS = ['B1p82atI3hNqtFSdOavB2Muc2ON2'];
+        function isAdminUser() { return !!(currentUser && ADMIN_UIDS.indexOf(currentUser.uid) !== -1); }
+
+        let isHumanVerified = false;
+        let pendingGatewayTarget = 'admin';
+
+        let promoCode = localStorage.getItem('ff_promo_code') || 'BNX-CYBER-50';
+        let promoCfg = JSON.parse(localStorage.getItem('ff_promo_cfg') || 'null') || { balance: 200, cost: 50, discount: 100, all: false };
+        let uidFilterTg = localStorage.getItem('ff_uid_filter_tg') || 'https://t.me/bnxknirob';
+
+        let socialLinks = JSON.parse(localStorage.getItem('ff_socials')) || {
+            mainTg: 'https://t.me/bnxknirob',
+            coTg: 'https://t.me/bnxknirob',
+            dealTg: 'https://t.me/bnxknirob',
+            tiktok: 'https://tiktok.com',
+            youtube: 'https://youtube.com',
+            instagram: 'https://instagram.com',
+            whatsapp: 'https://whatsapp.com'
+        };
+
+        let offerSettings = JSON.parse(localStorage.getItem('ff_offer')) || { enabled: false, title: 'Special Event Discount!', imgUrl: '' };
+
+        // Background audio settings
+        const DEFAULT_AUDIO_URL = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+        let musicEnabled = localStorage.getItem('ff_music_enabled') !== 'false';
+        let _savedAudioUrl = localStorage.getItem('ff_audio_url');
+        let storedAudioUrl = (_savedAudioUrl === null) ? DEFAULT_AUDIO_URL : _savedAudioUrl;
+        let _savedVolume = parseFloat(localStorage.getItem('ff_music_volume'));
+        let musicVolume = isNaN(_savedVolume) ? 0.5 : Math.min(1, Math.max(0, _savedVolume));
+        let audioStarted = false;
+
+        let storedBgPhotoUrl = localStorage.getItem('ff_bg_photo_url') || '';
+        let activityHistory = JSON.parse(localStorage.getItem('ff_activity_history')) || [];
+
+        let currentSelectedItem = null;
+        const audio = document.getElementById('bgAudio');
+        localStorage.removeItem('ff_admin_pass'); // old stored admin password is wiped from this device
+
+        // ---------- Auth / Ban / User Management / Tracking ----------
+        let currentUser = null;
+        let currentUserRecord = null;
+        let currentUserUnsub = null;
+        let allUsersCache = {};
+        let authMode = 'login';
+        let selectedUserUid = null;
+
+        const SUSPICIOUS_THRESHOLDS = {
+            wrongPromoCount: 10,
+            uidSearchCount: 60,
+            buyClickCount: 40,
+            loginFailCount: 8,
+            adminAttemptCount: 3
+        };
+
+        function switchAuthTab(mode) {
+            authMode = mode;
+            const loginTab = document.getElementById('authTabLogin');
+            const signupTab = document.getElementById('authTabSignup');
+            loginTab.classList.toggle('bg-cyan-400', mode === 'login');
+            loginTab.classList.toggle('text-black', mode === 'login');
+            loginTab.classList.toggle('text-gray-300', mode !== 'login');
+            signupTab.classList.toggle('bg-cyan-400', mode === 'signup');
+            signupTab.classList.toggle('text-black', mode === 'signup');
+            signupTab.classList.toggle('text-gray-300', mode !== 'signup');
+            document.getElementById('authUsernameInput').classList.toggle('hidden', mode !== 'signup');
+            document.getElementById('pwStrengthWrap').classList.toggle('hidden', mode !== 'signup');
+            document.getElementById('authSubmitBtn').innerHTML = mode === 'signup'
+                ? '<i class="fas fa-user-plus"></i><span>সাইন আপ করুন</span>'
+                : '<i class="fas fa-fingerprint"></i><span>লগ ইন করুন</span>';
+            hideAuthError();
+        }
+
+        function toggleAuthPassVisibility() {
+            const inp = document.getElementById('authPasswordInput');
+            const eye = document.getElementById('authPassEye');
+            if (inp.type === 'password') { inp.type = 'text'; eye.classList.replace('fa-eye', 'fa-eye-slash'); }
+            else { inp.type = 'password'; eye.classList.replace('fa-eye-slash', 'fa-eye'); }
+        }
+
+        function updatePwStrength() {
+            const val = document.getElementById('authPasswordInput').value;
+            const bar = document.getElementById('pwStrengthBar');
+            const label = document.getElementById('pwStrengthLabel');
+            let score = 0;
+            if (val.length >= 6) score++;
+            if (val.length >= 10) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+
+            const levels = [
+                { w: '15%', c: 'bg-red-600', t: 'পাসওয়ার্ড শক্তি: খুব দুর্বল' },
+                { w: '35%', c: 'bg-red-500', t: 'পাসওয়ার্ড শক্তি: দুর্বল' },
+                { w: '55%', c: 'bg-amber-500', t: 'পাসওয়ার্ড শক্তি: মাঝারি' },
+                { w: '75%', c: 'bg-cyan-400', t: 'পাসওয়ার্ড শক্তি: ভালো' },
+                { w: '100%', c: 'bg-brand-hacker', t: 'পাসওয়ার্ড শক্তি: শক্তিশালী' }
+            ];
+            const lvl = levels[Math.min(score, 4)];
+            bar.style.width = lvl.w;
+            bar.className = 'h-1 rounded-full transition-all duration-300 ' + lvl.c;
+            label.innerText = lvl.t;
+        }
+
+        function showForgotPassPanel() {
+            document.getElementById('authMainPanel').classList.add('hidden');
+            document.getElementById('authForgotPanel').classList.remove('hidden');
+            document.getElementById('forgotErrorBox').classList.add('hidden');
+            document.getElementById('forgotSuccessBox').classList.add('hidden');
+            document.getElementById('forgotEmailInput').value = document.getElementById('authEmailInput').value || '';
+        }
+
+        function hideForgotPassPanel() {
+            document.getElementById('authForgotPanel').classList.add('hidden');
+            document.getElementById('authMainPanel').classList.remove('hidden');
+        }
+
+        let _fpCooldownUntil = 0;
+        async function submitForgotPassword() {
+            const email = document.getElementById('forgotEmailInput').value.trim().toLowerCase();
+            const errBox = document.getElementById('forgotErrorBox');
+            const okBox = document.getElementById('forgotSuccessBox');
+            errBox.classList.add('hidden');
+            okBox.classList.add('hidden');
+
+            if (!email) { errBox.innerText = 'আপনার Gmail দিন।'; errBox.classList.remove('hidden'); return; }
+
+            const wait = Math.ceil((_fpCooldownUntil - Date.now()) / 1000);
+            if (wait > 0) { errBox.innerText = 'আবার পাঠাতে ' + wait + ' সেকেন্ড অপেক্ষা করুন।'; errBox.classList.remove('hidden'); return; }
+
+            const btn = document.getElementById('forgotSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>পাঠানো হচ্ছে...</span>';
+
+            try {
+                await window.fbSendPasswordReset(email);
+                _fpCooldownUntil = Date.now() + 60000;
+                okBox.innerText = 'রিসেট লিংক পাঠানো হয়েছে! Inbox ও Spam ফোল্ডার দেখুন। (যে ইমেইলে সাইন আপ করেছেন সেটাই দিতে হবে)';
+                okBox.classList.remove('hidden');
+                logActivity('Password Reset Requested', `Reset link requested for ${email}`);
+            } catch (err) {
+                console.error(err);
+                errBox.innerText = friendlyAuthError(err.code) + ' [' + (err.code || err.message) + ']';
+                errBox.classList.remove('hidden');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i><span>রিসেট লিংক পাঠান</span>';
+        }
+
+        function showAuthError(msg) {
+            const box = document.getElementById('authErrorBox');
+            box.innerText = msg;
+            box.classList.remove('hidden');
+        }
+        function hideAuthError() {
+            document.getElementById('authErrorBox').classList.add('hidden');
+        }
+
+        function friendlyAuthError(code) {
+            const map = {
+                'auth/email-already-in-use': 'এই ইমেইল দিয়ে আগেই অ্যাকাউন্ট আছে।',
+                'auth/invalid-email': 'সঠিক ইমেইল দিন।',
+                'auth/weak-password': 'পাসওয়ার্ড কমপক্ষে ৬ ক্যারেক্টার হতে হবে।',
+                'auth/user-not-found': 'এই ইমেইলে কোনো অ্যাকাউন্ট নেই।',
+                'auth/wrong-password': 'ভুল পাসওয়ার্ড!',
+                'auth/invalid-credential': 'ইমেইল বা পাসওয়ার্ড ভুল!',
+                'auth/too-many-requests': 'অনেকবার চেষ্টা করা হয়েছে, কিছুক্ষণ পর চেষ্টা করুন।'
+            };
+            return map[code] || 'কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।';
+        }
+
+        async function submitAuthForm() {
+            hideAuthError();
+            const email = document.getElementById('authEmailInput').value.trim();
+            const pass = document.getElementById('authPasswordInput').value;
+            const username = document.getElementById('authUsernameInput').value.trim();
+
+            if (!email || !pass) { showAuthError('ইমেইল ও পাসওয়ার্ড দিন।'); return; }
+            if (authMode === 'signup' && !username) { showAuthError('ইউজারনেম দিন।'); return; }
+
+            const btn = document.getElementById('authSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>অপেক্ষা করুন...</span>';
+
+            try {
+                if (authMode === 'signup') {
+                    const cred = await window.fbSignUp(email, pass);
+                    await window.fbUpdateProfile(cred.user, { displayName: username });
+                    await window.dbSet(window.dbRef(window.db, 'users/' + cred.user.uid), {
+                        username: username,
+                        email: email,
+                        banned: false,
+                        banReason: '',
+                        createdAt: Date.now(),
+                        lastLogin: Date.now(),
+                        stats: { wrongPromoCount: 0, uidSearchCount: 0, buyClickCount: 0, loginFailCount: 0, adminAttemptCount: 0 }
+                    });
+                    logActivity('Account Created', `New signup: ${username} (${email})`);
+                } else {
+                    await window.fbSignIn(email, pass);
+                }
+            } catch (err) {
+                console.error(err);
+                showAuthError(friendlyAuthError(err.code));
+                trackLoginFailByEmail(email);
+                btn.disabled = false;
+                btn.innerHTML = authMode === 'signup' ? '<i class="fas fa-user-plus"></i><span>সাইন আপ করুন</span>' : '<i class="fas fa-fingerprint"></i><span>লগ ইন করুন</span>';
+                return;
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = authMode === 'signup' ? '<i class="fas fa-user-plus"></i><span>সাইন আপ করুন</span>' : '<i class="fas fa-fingerprint"></i><span>লগ ইন করুন</span>';
+        }
+
+        function trackLoginFailByEmail(email) {
+            // Best-effort: find the matching user record by email in cache (if admin has loaded it before) and bump loginFailCount.
+            if (!email) return;
+            const entry = Object.entries(allUsersCache).find(([uid, u]) => u && u.email === email);
+            if (entry) {
+                const [uid, u] = entry;
+                const newVal = ((u.stats && u.stats.loginFailCount) || 0) + 1;
+                window.dbSet(window.dbRef(window.db, 'users/' + uid + '/stats/loginFailCount'), newVal).catch(() => {});
+            }
+        }
+
+        function confirmLogout() {
+            if (confirm('আপনি কি লগ আউট করতে চান?')) doLogout();
+        }
+
+        async function doLogout() {
+            try {
+                if (currentUserUnsub) { currentUserUnsub(); currentUserUnsub = null; }
+                await window.fbSignOut();
+            } catch (e) { console.error(e); }
+        }
+
+        function getDeviceId() {
+            let d = localStorage.getItem('ff_device_id');
+            if (!d) {
+                d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+                localStorage.setItem('ff_device_id', d);
+            }
+            return d;
+        }
+
+        function refreshAdminUI() {
+            const b = document.getElementById('addAccountBtn');
+            if (b) b.classList.toggle('hidden', !isAdminUser());
+            renderListings();
+        }
+
+        window.handleAuthStateChange = function(user) {
+            currentUser = user;
+
+            // Offline: popup only. No loading screen, no login screen.
+            if (!navigator.onLine) { showOfflinePopup(); if (window.hideBootCover) window.hideBootCover(); return; }
+
+            if (!user) {
+                localStorage.removeItem('ff_had_session');
+                currentUserRecord = null; updatePromoUI();
+                if (currentUserUnsub) { currentUserUnsub(); currentUserUnsub = null; }
+                document.getElementById('logoutBtn').classList.add('hidden');
+                document.getElementById('banScreenOverlay').classList.add('hidden');
+                document.getElementById('authGateOverlay').classList.remove('hidden');
+                document.getElementById('introLoadingScreen').style.display = 'none';
+                refreshAdminUI();
+                if (window.hideBootCover) window.hideBootCover();
+                return;
+            }
+
+            // Already logged in on this device earlier => silent background check, login popup never shows.
+            localStorage.setItem('ff_had_session', '1');
+            document.getElementById('authGateOverlay').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+
+            if (!sessionStorage.getItem('introShown')) {
+                const intro = document.getElementById('introLoadingScreen');
+                intro.style.display = 'flex';
+                intro.style.opacity = '1';
+                clearTimeout(window.__introTimer);
+                window.__introTimer = setTimeout(() => { skipIntroVideo(); }, 3000);
+            }
+            // Intro (or home, if intro already shown this session) is now ready underneath: release the cover.
+            if (window.hideBootCover) window.hideBootCover();
+            if (typeof hookRatingSummary === 'function') hookRatingSummary();
+
+            const base = 'users/' + user.uid;
+            window.dbSet(window.dbRef(window.db, base + '/lastLogin'), Date.now()).catch(() => {});
+            window.dbSet(window.dbRef(window.db, base + '/devices/' + getDeviceId()), { lastSeen: Date.now(), ua: navigator.userAgent.slice(0, 120) }).catch(() => {});
+
+            if (currentUserUnsub) { currentUserUnsub(); }
+            currentUserUnsub = window.dbOnValue(window.dbRef(window.db, base), (snapshot) => {
+                const data = snapshot.val();
+                currentUserRecord = data;
+                if (data && !sessionStorage.getItem('openCounted')) {
+                    sessionStorage.setItem('openCounted', '1');
+                    window.dbSet(window.dbRef(window.db, base + '/stats/openCount'), ((data.stats && data.stats.openCount) || 0) + 1).catch(() => {});
+                }
+                updatePromoUI(); updateRefundInfo(); renderListings(); checkPriceDrops();
+                if (data && data.banned) {
+                    document.getElementById('banReasonText').innerText = data.banReason
+                        ? `কারণ: ${data.banReason}`
+                        : 'নিয়ম ভঙ্গের কারণে আপনাকে ব্লক করা হয়েছে। বিস্তারিত জানতে অ্যাডমিনের সাথে যোগাযোগ করুন।';
+                    document.getElementById('banScreenOverlay').classList.remove('hidden');
+                } else {
+                    document.getElementById('banScreenOverlay').classList.add('hidden');
+                }
+            });
+            refreshAdminUI();
+        };
+
+        if (window.__pendingAuthReady) {
+            window.handleAuthStateChange(window.__pendingAuthUser);
+        }
+
+        function trackUserStat(statName) {
+            if (!currentUser || !currentUserRecord) return;
+            const stats = currentUserRecord.stats || { wrongPromoCount: 0, uidSearchCount: 0, buyClickCount: 0, loginFailCount: 0, adminAttemptCount: 0 };
+            const newVal = (stats[statName] || 0) + 1;
+            window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/stats/' + statName), newVal).catch(() => {});
+        }
+
+        function loadUserManagementList() {
+            const container = document.getElementById('userMgmtListContainer');
+            container.innerHTML = '<div class="text-gray-400 text-center py-3">লোড হচ্ছে...</div>';
+
+            if (window.__usersUnsub) window.__usersUnsub();
+            window.__usersUnsub = window.dbOnValue(window.dbRef(window.db, 'users'), (snapshot) => {
+                allUsersCache = snapshot.val() || {};
+                renderUserManagementList();
+            }, (error) => {
+                console.error(error);
+                container.innerHTML = '<div class="text-red-400 text-center py-3">ইউজার লিস্ট লোড করা যায়নি। Firebase Rules চেক করুন।</div>';
+            });
+        }
+
+        function walletFlags(u) {
+            const f = [], w = u && u.wallet;
+            if (!w) return f;
+            const bal = +w.balance || 0, gr = +w.granted || 0, sp = +w.spent || 0;
+            if (bal > gr - sp + 0.001) f.push('ব্যালেন্স দেওয়া প্রোমোর চেয়ে বেশি (' + bal + ' > ' + (gr - sp) + ')');
+            if (bal > Math.max((+promoCfg.balance || 0) * 3, 1000)) f.push('অস্বাভাবিক বেশি ব্যালেন্স: ' + bal);
+            const rf = Object.values(u.refunds || {}).reduce((a, b) => a + (+b || 0), 0);
+            const ratio = (+promoCfg.cost > 0) ? (+promoCfg.discount / +promoCfg.cost) : 0;
+            if (rf > sp * ratio * 1.01 + 1) f.push('রিফান্ড ডিসকাউন্ট খরচের চেয়ে বেশি (' + rf + ')');
+            return f;
+        }
+
+        function isSuspicious(stats) {
+            if (!stats) return false;
+            return (stats.wrongPromoCount || 0) >= SUSPICIOUS_THRESHOLDS.wrongPromoCount ||
+                   (stats.uidSearchCount || 0) >= SUSPICIOUS_THRESHOLDS.uidSearchCount ||
+                   (stats.buyClickCount || 0) >= SUSPICIOUS_THRESHOLDS.buyClickCount ||
+                   (stats.loginFailCount || 0) >= SUSPICIOUS_THRESHOLDS.loginFailCount ||
+                   (stats.adminAttemptCount || 0) >= SUSPICIOUS_THRESHOLDS.adminAttemptCount;
+        }
+
+        function renderUserManagementList() {
+            const container = document.getElementById('userMgmtListContainer');
+            const search = (document.getElementById('userMgmtSearch').value || '').toLowerCase();
+
+            const entries = Object.entries(allUsersCache).filter(([uid, u]) => {
+                if (!u) return false;
+                const hay = ((u.username || '') + ' ' + (u.email || '')).toLowerCase();
+                return hay.includes(search);
+            });
+
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-center py-3">কোনো ইউজার পাওয়া যায়নি। "রিফ্রেশ" চাপুন।</div>';
+                return;
+            }
+
+            // Sort newest-first by createdAt so recent signups are easy to spot
+            entries.sort((a, b) => (walletFlags(b[1]).length - walletFlags(a[1]).length) || ((+((b[1].wallet||{}).balance)||0) - (+((a[1].wallet||{}).balance)||0)) || ((b[1].createdAt || 0) - (a[1].createdAt || 0)));
+
+            container.innerHTML = entries.map(([uid, u]) => {
+                const sus = isSuspicious(u.stats) || walletFlags(u).length > 0;
+                const s = u.stats || {};
+                return `
+                <div onclick="openUserDetailModal('${escapeHtml(uid)}')" class="bg-black/60 p-2.5 rounded-xl border ${u.banned ? 'border-red-500/60' : 'border-brand-border'} space-y-1.5 cursor-pointer hover:border-cyan-400/60 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-white font-bold text-xs">${escapeHtml(u.username || 'N/A')}</span>
+                            ${u.banned ? '<span class="ml-2 px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 text-[9px] font-bold">BANNED</span>' : ''}
+                            ${sus && !u.banned ? '<span class="ml-2 px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 text-[9px] font-bold">⚠ সন্দেহজনক</span>' : ''}
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-500 text-[10px]"></i>
+                    </div>
+                    <p class="text-gray-400 text-[10px]">${escapeHtml(u.email || '')}</p>
+                    <p class="text-amber-300 text-[10px] font-bold">💰 ব্যালেন্স: ${(u.wallet && u.wallet.balance) || 0} · অ্যাপ ওপেন: ${s.openCount||0} বার</p>
+                    <p class="text-gray-500 text-[9px]">Promo ভুল: ${s.wrongPromoCount||0} · UID সার্চ: ${s.uidSearchCount||0} · Buy ক্লিক: ${s.buyClickCount||0} · লগ ইন ব্যর্থ: ${s.loginFailCount||0} · অ্যাডমিন চেষ্টা: ${s.adminAttemptCount||0}</p>
+                </div>`;
+            }).join('');
+        }
+
+        function openUserDetailModal(uid) {
+            selectedUserUid = uid;
+            const u = allUsersCache[uid];
+            if (!u) return;
+            const s = u.stats || {};
+            const wf = walletFlags(u);
+            const sus = isSuspicious(s) || wf.length > 0;
+            const w = u.wallet || {};
+            const rfTotal = Object.values(u.refunds || {}).reduce((a, b) => a + (+b || 0), 0);
+            const created = u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A';
+            const lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'N/A';
+
+            document.getElementById('userDetailBody').innerHTML = `
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-black text-white">${escapeHtml(u.username || 'N/A')}</h4>
+                    ${u.banned ? '<span class="px-2 py-1 rounded-full bg-red-900/60 text-red-300 text-[10px] font-bold">BANNED</span>' : (sus ? '<span class="px-2 py-1 rounded-full bg-amber-900/60 text-amber-300 text-[10px] font-bold">⚠ সন্দেহজনক</span>' : '<span class="px-2 py-1 rounded-full bg-emerald-900/60 text-emerald-300 text-[10px] font-bold">স্বাভাবিক</span>')}
+                </div>
+                <p class="text-gray-400">${escapeHtml(u.email || '')}</p>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <div class="bg-black/60 p-2 rounded-xl border border-brand-border"><p class="text-gray-500 text-[9px]">একাউন্ট খোলার সময়</p><p class="text-cyan-300 text-[10px]">${created}</p></div>
+                    <div class="bg-black/60 p-2 rounded-xl border border-brand-border"><p class="text-gray-500 text-[9px]">শেষ লগ ইন</p><p class="text-cyan-300 text-[10px]">${lastLogin}</p></div>
+                </div>
+                <div class="bg-black/60 p-2.5 rounded-xl border ${wf.length ? 'border-red-500/60' : 'border-brand-border'} space-y-1">
+                    <p class="text-gray-500 text-[9px] uppercase font-bold">প্রোমো ওয়ালেট</p>
+                    <p class="text-gray-300 text-[10px]">বর্তমান ব্যালেন্স: <span class="text-emerald-300">${w.balance||0}</span> · মোট পেয়েছে: <span class="text-cyan-300">${w.granted||0}</span> · খরচ: <span class="text-amber-300">${w.spent||0}</span></p>
+                    <p class="text-gray-300 text-[10px]">মোট রিফান্ড ডিসকাউন্ট: <span class="text-amber-300">৳${rfTotal}</span> · অ্যাপ ওপেন: <span class="text-cyan-300">${s.openCount||0}</span> বার</p>
+                    ${wf.map(x => '<p class="text-red-300 text-[10px] font-bold">⚠ ' + escapeHtml(x) + '</p>').join('')}
+                </div>
+                <div class="bg-black/60 p-2.5 rounded-xl border border-brand-border space-y-1">
+                    <p class="text-gray-500 text-[9px] uppercase font-bold">অ্যাক্টিভিটি ট্র্যাকিং</p>
+                    <p class="text-gray-300 text-[10px]">ভুল প্রমো কোড: <span class="text-amber-300">${s.wrongPromoCount||0}</span></p>
+                    <p class="text-gray-300 text-[10px]">UID সার্চ করেছে: <span class="text-amber-300">${s.uidSearchCount||0}</span> বার</p>
+                    <p class="text-gray-300 text-[10px]">Buy Now ক্লিক: <span class="text-amber-300">${s.buyClickCount||0}</span> বার</p>
+                    <p class="text-gray-300 text-[10px]">লগ ইন ব্যর্থ হয়েছে: <span class="text-amber-300">${s.loginFailCount||0}</span> বার</p>
+                    <p class="text-gray-300 text-[10px]">অ্যাডমিন প্যানেল খোলার চেষ্টা: <span class="text-red-300">${s.adminAttemptCount||0}</span> বার</p>
+                </div>
+                ${u.banned ? `<div class="bg-red-950/40 border border-red-500/40 p-2.5 rounded-xl"><p class="text-red-300 text-[10px] font-bold">বর্তমান ব্যানের কারণ:</p><p class="text-red-200 text-[10px]">${escapeHtml(u.banReason || 'কারণ লেখা হয়নি')}</p></div>` : ''}
+            `;
+
+            document.getElementById('userDetailBanReason').value = '';
+            document.getElementById('userDetailBanBtn').classList.toggle('hidden', !!u.banned);
+            document.getElementById('userDetailUnbanBtn').classList.toggle('hidden', !u.banned);
+            document.getElementById('userDetailModal').classList.remove('hidden');
+        }
+
+        function closeUserDetailModal() {
+            document.getElementById('userDetailModal').classList.add('hidden');
+            selectedUserUid = null;
+        }
+
+        function userDetailToggleBan(makeBanned) {
+            if (!selectedUserUid) return;
+            const reason = makeBanned ? document.getElementById('userDetailBanReason').value.trim() : '';
+            if (makeBanned && !reason) {
+                alert('দয়া করে ব্যানের কারণ লিখুন, ইউজার এটা দেখতে পাবে।');
+                return;
+            }
+            window.dbSet(window.dbRef(window.db, 'users/' + selectedUserUid + '/banned'), makeBanned).catch(() => {});
+            window.dbSet(window.dbRef(window.db, 'users/' + selectedUserUid + '/banReason'), reason).catch(() => {});
+            if (allUsersCache[selectedUserUid]) {
+                allUsersCache[selectedUserUid].banned = makeBanned;
+                allUsersCache[selectedUserUid].banReason = reason;
+            }
+            renderUserManagementList();
+            logActivity(makeBanned ? 'User Banned' : 'User Unbanned', `UID: ${selectedUserUid}${reason ? ' — কারণ: ' + reason : ''}`);
+            closeUserDetailModal();
+        }
+        // ---------- End Auth / Ban / User Management ----------
+
+        window.onload = function() {
+            logActivity('App Launched / Visited', 'User loaded the BNX FF SHOP homepage.');
+            updateSocialUI();
+            applyBackgroundPhoto();
+            setupSmartAudio();
+            renderListings();
+            updatePromoUI();
+
+            if (sessionStorage.getItem('introShown')) {
+                audioStarted = true;
+                checkSpecialOfferPopup();
+            }
+        };
+
+        function logActivity(type, desc) {
+            const timeStr = new Date().toLocaleString();
+            activityHistory.unshift(`<span class="text-cyan-400">[${escapeHtml(type)}]</span> ${escapeHtml(desc)} <span class="text-gray-500">(${timeStr})</span>`);
+            if(activityHistory.length > 30) activityHistory.pop();
+            localStorage.setItem('ff_activity_history', JSON.stringify(activityHistory));
+        }
+
+        // ---------- Smart Audio System ----------
+        function canPlayAudioNow() {
+            return audioStarted && musicEnabled && !!audio.getAttribute('src') && navigator.onLine && !document.hidden;
+        }
+
+        function pauseAudioNow() {
+            try { audio.pause(); } catch (e) {}
+        }
+
+        function resumeAudioIfAllowed() {
+            if (canPlayAudioNow() && audio.paused) {
+                audio.play().catch(e => console.log("Audio interaction needed"));
+            }
+        }
+
+        function applyAudioSettings(playNow) {
+            if (musicEnabled && storedAudioUrl) {
+                if (audio.getAttribute('src') !== storedAudioUrl) {
+                    audio.src = storedAudioUrl;
+                }
+                audio.volume = musicVolume;
+                if (playNow) playAudio();
+            } else {
+                pauseAudioNow();
+                audio.removeAttribute('src');
+                try { audio.load(); } catch (e) {}
+            }
+        }
+
+        function setupSmartAudio() {
+            applyAudioSettings(false);
+            if (window.remoteAudio) window.applyRemoteAudio(window.remoteAudio);
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) pauseAudioNow();
+                else resumeAudioIfAllowed();
+            });
+            window.addEventListener('pagehide', pauseAudioNow);
+            window.addEventListener('pageshow', resumeAudioIfAllowed);
+            window.addEventListener('blur', pauseAudioNow);
+            window.addEventListener('focus', resumeAudioIfAllowed);
+
+            ['click', 'touchstart'].forEach(evt => {
+                document.addEventListener(evt, function() {
+                    if (audio.paused) resumeAudioIfAllowed();
+                }, { passive: true });
+            });
+        }
+
+        function playAudio() {
+            audioStarted = true;
+            resumeAudioIfAllowed();
+        }
+
+        window.applyRemoteAudio = function(a) {
+            if (!a) return;
+            musicEnabled = a.enabled !== false;
+            if (typeof a.url === 'string') storedAudioUrl = a.url;
+            if (typeof a.volume === 'number') musicVolume = Math.min(1, Math.max(0, a.volume));
+            localStorage.setItem('ff_music_enabled', musicEnabled ? 'true' : 'false');
+            localStorage.setItem('ff_audio_url', storedAudioUrl);
+            localStorage.setItem('ff_music_volume', musicVolume);
+            applyAudioSettings(audioStarted);
+        };
+
+        window.applyRemoteBgPhoto = function(url) {
+            storedBgPhotoUrl = url || '';
+            if (storedBgPhotoUrl) {
+                document.body.style.backgroundImage = `linear-gradient(rgba(3, 5, 8, 0.55), rgba(3, 5, 8, 0.55)), url('${storedBgPhotoUrl}')`;
+            } else {
+                document.body.style.backgroundImage = 'none';
+            }
+        };
+
+        window.syncRemoteSettings = function(data) {
+            if (data.promoCode) promoCode = data.promoCode;
+            if (data.promoCfg) promoCfg = data.promoCfg;
+            if (data.uidFilterTg) uidFilterTg = data.uidFilterTg;
+            if (data.socials) socialLinks = data.socials;
+            if (data.offer) offerSettings = data.offer;
+            updatePromoUI();
+        };
+
+        function onAdminVolumeInput(val) {
+            const v = Math.min(100, Math.max(0, parseInt(val) || 0));
+            document.getElementById('adminAudioVolumeLabel').innerText = v + '%';
+            audio.volume = v / 100;
+        }
+
+        // ---------- Offline Blocker ----------
+        function showOfflinePopup() {
+            document.getElementById('offlineOverlay').classList.remove('hidden');
+            pauseAudioNow();
+        }
+
+        function hideOfflinePopup() {
+            document.getElementById('offlineOverlay').classList.add('hidden');
+            resumeAudioIfAllowed();
+        }
+
+        function handleBackOnline() {
+            if (window.__startedOffline) {
+                window.location.reload();
+            } else {
+                hideOfflinePopup();
+            }
+        }
+
+        function retryConnection() {
+            if (navigator.onLine) {
+                handleBackOnline();
+            } else {
+                showOfflinePopup();
+            }
+        }
+
+        window.addEventListener('offline', showOfflinePopup);
+        window.addEventListener('online', handleBackOnline);
+
+        function clearField(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) el.value = '';
+        }
+
+        function openExternalLink(key) {
+            audio.pause();
+            const url = socialLinks[key] || 'https://t.me/bnxknirob';
+            logActivity('External Link', `Navigated to ${key}: ${url}`);
+
+            let intentUrl = '';
+
+            if (key === 'youtube') {
+                const videoIdMatch = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([\w-]{11})/);
+                const channelMatch = url.match(/youtube\.com\/(?:@|c\/|channel\/)([\w-]+)/);
+
+                if (videoIdMatch) {
+                    intentUrl = `vnd.youtube://${videoIdMatch[1]}`;
+                } else if (channelMatch) {
+                    intentUrl = `vnd.youtube://www.youtube.com/@${channelMatch[1]}`;
+                } else {
+                    intentUrl = `vnd.youtube://www.youtube.com`;
+                }
+            } else if (key === 'tiktok') {
+                const usernameMatch = url.match(/tiktok\.com\/@([\w.-]+)/);
+                if (usernameMatch) {
+                    intentUrl = `snssdk1233://user/profile/${usernameMatch[1]}`;
+                } else {
+                    intentUrl = `snssdk1233://aweme/detail/0`;
+                }
+            } else if (key === 'instagram') {
+                const igMatch = url.match(/instagram\.com\/([\w.-]+)/);
+                if (igMatch) {
+                    intentUrl = `instagram://user?username=${igMatch[1]}`;
+                } else {
+                    intentUrl = `instagram://app`;
+                }
+            } else if (key === 'whatsapp') {
+                const cleanWa = url.replace(/[^0-9]/g, '');
+                intentUrl = `whatsapp://send?phone=${cleanWa}`;
+            } else if (key === 'mainTg' || key === 'coTg' || key === 'dealTg') {
+                const tgUser = url.replace(/https?:\/\/t\.me\//, '').replace('@', '');
+                intentUrl = `tg://resolve?domain=${tgUser}`;
+            }
+
+            if (intentUrl) {
+                window.location.href = intentUrl;
+                setTimeout(() => {
+                    window.open(url, '_blank');
+                }, 500);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        function skipIntroVideo() {
+            sessionStorage.setItem('introShown', 'true');
+            const screen = document.getElementById('introLoadingScreen');
+            if(screen) {
+                screen.style.opacity = '0';
+                setTimeout(() => {
+                    screen.style.display = 'none';
+                    checkSpecialOfferPopup();
+                }, 500);
+            }
+            playAudio();
+        }
+
+        function updateSocialUI() {
+            localStorage.setItem('ff_socials', JSON.stringify(socialLinks));
+        }
+
+        function applyBackgroundPhoto() {
+            if(storedBgPhotoUrl) {
+                document.body.style.backgroundImage = `linear-gradient(rgba(3, 5, 8, 0.55), rgba(3, 5, 8, 0.55)), url('${storedBgPhotoUrl}')`;
+            }
+        }
+
+        function clearBgPhoto() {
+            storedBgPhotoUrl = '';
+            document.getElementById('adminBgPhotoUrlInput').value = '';
+            localStorage.removeItem('ff_bg_photo_url');
+            document.body.style.backgroundImage = 'none';
+        }
+
+        function checkSpecialOfferPopup() {
+            if(offerSettings.enabled && offerSettings.imgUrl && !sessionStorage.getItem('offerShown')) {
+                document.getElementById('offerBannerImg').src = offerSettings.imgUrl;
+                document.getElementById('offerTitleText').innerText = offerSettings.title || 'Special Event Discount!';
+                document.getElementById('specialOfferModal').classList.remove('hidden');
+                sessionStorage.setItem('offerShown', 'true');
+            }
+        }
+
+        function closeSpecialOfferModal() { document.getElementById('specialOfferModal').classList.add('hidden'); }
+
+        // ---------- NEW Promo system (balance + refund, per device) ----------
+        function readJSON(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
+        function getWallet() { return (currentUserRecord && currentUserRecord.wallet) || { code: '', balance: 0, granted: 0, spent: 0 }; }
+        function getRefunds() { return (currentUserRecord && currentUserRecord.refunds) || {}; }
+
+        function updatePromoUI() {
+            document.querySelectorAll('.js-promo-bal').forEach(e => { e.innerHTML = '<svg class="pi" style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5c0-1 1.3-1.7 3-1.7s3 .7 3 1.7-1.3 1.6-3 1.9-3 .9-3 1.9 1.3 1.7 3 1.7 3-.7 3-1.7"/></svg><span>Promo: ' + (getWallet().balance||0) + '</span>'; });
+        }
+
+        function flashMsg(id, text, good) {
+            const el = document.getElementById(id);
+            el.innerText = text;
+            el.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
+            el.classList.add(good ? 'text-emerald-400' : 'text-red-400');
+        }
+
+        async function redeemPromoCode() {
+            const v = document.getElementById('promoPasteInput').value.trim().toUpperCase();
+            if (!v) return flashMsg('promoMsg', 'প্রোমো কোড পেস্ট করুন।', false);
+            if (!currentUser) return flashMsg('promoMsg', 'আগে লগ ইন করুন।', false);
+            if (v !== String(promoCode).toUpperCase()) {
+                trackUserStat('wrongPromoCount');
+                return flashMsg('promoMsg', 'ভুল প্রোমো কোড!', false);
+            }
+            const w = getWallet();
+            if (w.code === v) return flashMsg('promoMsg', 'এই কোড আপনার অ্যাকাউন্টে আগেই ব্যবহার হয়েছে। ব্যালেন্স: ' + (w.balance || 0), false);
+            const add = +promoCfg.balance || 0;
+            const nw = { balance: (+w.balance || 0) + add, granted: (+w.granted || 0) + add, spent: +w.spent || 0, code: v, ts: Date.now() };
+            try {
+                await window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/wallet'), nw);
+                flashMsg('promoMsg', 'সফল! ব্যালেন্স যোগ হয়েছে: ' + add, true);
+                document.getElementById('promoPasteInput').value = '';
+                logActivity('Promo Redeemed', v + ' +' + add);
+            } catch (e) {
+                console.error(e);
+                flashMsg('promoMsg', 'সেভ হয়নি, আবার চেষ্টা করুন। (' + (e.code || '') + ')', false);
+            }
+        }
+
+        function refundPlan(it) {
+            const bal = getWallet().balance, cost = +promoCfg.cost || 0, disc = +promoCfg.discount || 0;
+            const cur = Math.max(0, (+it.price || 0) - (getRefunds()[it.id] || 0));
+            let d, used;
+            if (promoCfg.all) {
+                const r = cost > 0 ? disc / cost : 0;
+                d = Math.min(Math.floor(bal * r), cur);
+                used = r > 0 ? Math.min(bal, Math.ceil(d / r)) : 0;
+            } else {
+                d = Math.min(disc, cur);
+                used = cost;
+            }
+            return { bal, cur, d, used };
+        }
+
+        function updateRefundInfo() {
+            if (!currentSelectedItem) return;
+            const p = refundPlan(currentSelectedItem);
+            document.getElementById('refundInfo').innerHTML =
+                `<p>বর্তমান দাম: <b class="text-amber-300">৳${p.cur}</b></p>` +
+                `<p>আপনার প্রোমো ব্যালেন্স: <b class="text-emerald-300">${p.bal}</b></p>` +
+                `<p>রিফান্ডে <b class="text-cyan-300">${p.used}</b> প্রোমো কাটা হবে → <b class="text-emerald-300">৳${p.d}</b> ডিসকাউন্ট</p>`;
+        }
+
+        function openBuyModal(id) {
+            const item = (window.listings || []).find(x => x.id === id);
+            if (!item) return;
+            currentSelectedItem = item;
+            trackUserStat('buyClickCount');
+            document.getElementById('refundMsg').classList.add('hidden');
+            updateRefundInfo();
+            loadReviews(item.id);
+            document.getElementById('buyModal').classList.remove('hidden');
+        }
+
+        function closeBuyModal() { document.getElementById('buyModal').classList.add('hidden'); if (reviewUnsub) { reviewUnsub(); reviewUnsub = null; } }
+
+        async function applyPromoRefund() {
+            const it = currentSelectedItem;
+            if (!it) return;
+            const p = refundPlan(it);
+            if (p.cur <= 0) return flashMsg('refundMsg', 'এই আইডির দাম আগেই ৳0 হয়ে গেছে।', false);
+            if (p.bal <= 0 || p.bal < p.used || p.d <= 0) return flashMsg('refundMsg', 'পর্যাপ্ত প্রোমো ব্যালেন্স নেই!', false);
+            if (!currentUser) return flashMsg('refundMsg', 'আগে লগ ইন করুন।', false);
+            const w = getWallet(), rf = getRefunds();
+            const nw = { balance: (+w.balance || 0) - p.used, granted: +w.granted || 0, spent: (+w.spent || 0) + p.used, code: w.code || '', ts: Date.now() };
+            try {
+                await window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/wallet'), nw);
+                await window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/refunds/' + it.id), (rf[it.id] || 0) + p.d);
+            } catch (e) { console.error(e); return flashMsg('refundMsg', 'সেভ হয়নি, আবার চেষ্টা করুন।', false); }
+            flashMsg('refundMsg', 'সফল! ৳' + p.d + ' কমে গেছে। নতুন দাম: ৳' + Math.max(0, p.cur - p.d), true);
+            logActivity('Promo Refund', 'Used ' + p.used + ' promo on ' + it.id);
+        }
+
+        function confirmPurchaseAction() {
+            closeBuyModal();
+            openExternalLink('dealTg');
+        }
+
+        async function executeUidLookup() {
+            const uid = document.getElementById('uidSearchInput').value.trim();
+            if(!uid || uid.length < 6) {
+                alert('সঠিক প্লেয়ার আইডি বা UID দিন!');
+                return;
+            }
+
+            trackUserStat('uidSearchCount');
+
+            const searchBtn = document.getElementById('uidApiSearchBtn');
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Checking...</span>';
+
+            try {
+                const response = await fetch(`https://auraffxserverinfocheckerapi.onrender.com/api/player?uid=${encodeURIComponent(uid)}`, {
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) throw new Error('API request failed');
+
+                const data = await response.json();
+                const playerName = data.name || (data.player && data.player.name) || (data.raw && data.raw.name) || '';
+
+                if (playerName && playerName !== 'None' && playerName !== 'null') {
+                    document.getElementById('uidResultUid').innerText = uid;
+                    document.getElementById('uidResultName').innerText = playerName;
+                    document.getElementById('uidSearchResultBox').classList.remove('hidden');
+                } else {
+                    alert('এই UID এর কোনো প্লেয়ার পাওয়া যায়নি!');
+                    document.getElementById('uidSearchResultBox').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('সার্ভার থেকে নাম চেক করা যায়নি। আবার চেষ্টা করুন।');
+                document.getElementById('uidSearchResultBox').classList.add('hidden');
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<i class="fas fa-search"></i><span>Search</span>';
+            }
+        }
+
+        function proceedUidDetails() {
+            const uid = document.getElementById('uidSearchInput').value.trim();
+            if(uid) navigator.clipboard.writeText(`Free Fire UID Filter Request: ${uid}`);
+            window.open(uidFilterTg || 'https://t.me/bnxknirob', '_blank');
+        }
+
+        function closeUidLookupModal() { document.getElementById('uidLookupModal').classList.add('hidden'); }
+        function openUidLookupModal() { document.getElementById('uidLookupModal').classList.remove('hidden'); }
+
+        // ---------- Admin gateway (admin account UID check — no password in code) ----------
+        function toggleHumanVerification() {
+            isHumanVerified = !isHumanVerified;
+            document.getElementById('verifyCheckIcon').classList.toggle('hidden', !isHumanVerified);
+        }
+
+        function openAdminSecurityModal(target = 'admin') {
+            pendingGatewayTarget = target;
+            document.getElementById('adminSecurityModal').classList.remove('hidden');
+        }
+
+        function closeAdminSecurityModal() { document.getElementById('adminSecurityModal').classList.add('hidden'); }
+
+        async function verifyAndOpenAdmin() {
+            if(!isHumanVerified) { alert('Please verify human check!'); return; }
+            if (!isAdminUser()) {
+                trackUserStat('adminAttemptCount');
+                logActivity('Admin Gateway Failed', `Non-admin tried to open admin panel${currentUserRecord ? ' (' + (currentUserRecord.username || '') + ')' : ''}.`);
+                alert('শুধু অ্যাডমিন অ্যাকাউন্ট দিয়ে এটা খোলা যায়।' + (currentUser ? '\nআপনার UID: ' + currentUser.uid : ''));
+                return;
+            }
+            closeAdminSecurityModal();
+            if(pendingGatewayTarget === 'add_video') {
+                openAddListingModalDirect();
+            } else {
+                openAdminPanel();
+            }
+        }
+
+        function openAdminPanel() {
+            document.getElementById('pmCode').value = promoCode || 'BNX-CYBER-50';
+            document.getElementById('pmBalance').value = promoCfg.balance;
+            document.getElementById('pmCost').value = promoCfg.cost;
+            document.getElementById('pmDiscount').value = promoCfg.discount;
+            document.getElementById('pmAll').checked = !!promoCfg.all;
+            document.getElementById('adminUidFilterTgInput').value = uidFilterTg || 'https://t.me/bnxknirob';
+            document.getElementById('adminMainTgInput').value = socialLinks.mainTg || '';
+            document.getElementById('adminCoTgInput').value = socialLinks.coTg || '';
+            document.getElementById('adminDealTgInput').value = socialLinks.dealTg || '';
+            document.getElementById('adminTiktokInput').value = socialLinks.tiktok || '';
+            document.getElementById('adminYoutubeInput').value = socialLinks.youtube || '';
+            document.getElementById('adminInstagramInput').value = socialLinks.instagram || '';
+            document.getElementById('adminWhatsappInput').value = socialLinks.whatsapp || '';
+
+            document.getElementById('adminOfferStatus').checked = offerSettings.enabled;
+            document.getElementById('adminOfferTitleInput').value = offerSettings.title;
+            document.getElementById('adminOfferImgUrlInput').value = offerSettings.imgUrl;
+            (function(){ const e = document.getElementById('adminOfferEndInput'); if (offerSettings.endsAt) { const d = new Date(+offerSettings.endsAt); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); e.value = d.toISOString().slice(0,16); } else { e.value = ''; } })();
+            document.getElementById('adminBgPhotoUrlInput').value = storedBgPhotoUrl;
+
+            document.getElementById('adminAudioStatus').checked = musicEnabled;
+            document.getElementById('adminAudioUrlInput').value = storedAudioUrl || '';
+            const volPercent = Math.round(musicVolume * 100);
+            document.getElementById('adminAudioVolume').value = volPercent;
+            document.getElementById('adminAudioVolumeLabel').innerText = volPercent + '%';
+
+            renderHistoryLog();
+            loadUserManagementList();
+            document.getElementById('adminModal').classList.remove('hidden');
+        }
+
+        function closeAdminModal() {
+            document.getElementById('adminModal').classList.add('hidden');
+            audio.volume = musicVolume;
+        }
+
+        async function saveAdminSettings() {
+            if (!isAdminUser()) { alert('শুধু অ্যাডমিন সেভ করতে পারবে।'); return; }
+
+            promoCode = document.getElementById('pmCode').value.trim() || 'BNX-CYBER-50';
+            promoCfg = {
+                balance: parseFloat(document.getElementById('pmBalance').value) || 0,
+                cost: parseFloat(document.getElementById('pmCost').value) || 0,
+                discount: parseFloat(document.getElementById('pmDiscount').value) || 0,
+                all: document.getElementById('pmAll').checked
+            };
+            uidFilterTg = document.getElementById('adminUidFilterTgInput').value.trim() || 'https://t.me/bnxknirob';
+
+            localStorage.setItem('ff_promo_code', promoCode);
+            localStorage.setItem('ff_promo_cfg', JSON.stringify(promoCfg));
+            localStorage.setItem('ff_uid_filter_tg', uidFilterTg);
+
+            socialLinks = {
+                dealTg: document.getElementById('adminDealTgInput').value.trim(),
+                mainTg: document.getElementById('adminMainTgInput').value.trim(),
+                coTg: document.getElementById('adminCoTgInput').value.trim(),
+                tiktok: document.getElementById('adminTiktokInput').value.trim(),
+                youtube: document.getElementById('adminYoutubeInput').value.trim(),
+                instagram: document.getElementById('adminInstagramInput').value.trim(),
+                whatsapp: document.getElementById('adminWhatsappInput').value.trim()
+            };
+
+            offerSettings = {
+                enabled: document.getElementById('adminOfferStatus').checked,
+                title: document.getElementById('adminOfferTitleInput').value.trim(),
+                imgUrl: document.getElementById('adminOfferImgUrlInput').value.trim(),
+                endsAt: (function(){ const v = document.getElementById('adminOfferEndInput').value; const t = v ? new Date(v).getTime() : 0; return isNaN(t) ? 0 : t; })()
+            };
+
+            storedBgPhotoUrl = document.getElementById('adminBgPhotoUrlInput').value.trim();
+
+            musicEnabled = document.getElementById('adminAudioStatus').checked;
+            storedAudioUrl = document.getElementById('adminAudioUrlInput').value.trim();
+            musicVolume = Math.min(1, Math.max(0, (parseInt(document.getElementById('adminAudioVolume').value) || 0) / 100));
+
+            localStorage.setItem('ff_music_enabled', musicEnabled ? 'true' : 'false');
+            localStorage.setItem('ff_audio_url', storedAudioUrl);
+            localStorage.setItem('ff_music_volume', musicVolume);
+
+            localStorage.setItem('ff_socials', JSON.stringify(socialLinks));
+            localStorage.setItem('ff_offer', JSON.stringify(offerSettings));
+            localStorage.setItem('ff_bg_photo_url', storedBgPhotoUrl);
+
+            applyBackgroundPhoto();
+            applyAudioSettings(true);
+            updatePromoUI();
+
+            if (window.db && window.dbRef && window.dbSet) {
+                window.dbSet(window.dbRef(window.db, 'settings'), {
+                    promoCode: promoCode,
+                    promoCfg: promoCfg,
+                    uidFilterTg: uidFilterTg,
+                    socials: socialLinks,
+                    offer: offerSettings,
+                    audio: {
+                        enabled: musicEnabled,
+                        url: storedAudioUrl,
+                        volume: musicVolume
+                    },
+                    bgPhotoUrl: storedBgPhotoUrl
+                }).then(() => {
+                    closeAdminModal();
+                    alert('সফল! সব ডিভাইসে সিঙ্ক হয়েছে।');
+                    logActivity('Settings Updated', 'Admin modified settings successfully.');
+                }).catch(err => {
+                    console.error(err);
+                    alert('সেভ ব্যর্থ! Firebase-এ লেখা যায়নি। Rules চেক করুন। এরর: ' + err.code);
+                });
+            } else {
+                alert('Firebase সংযোগ নেই! ইন্টারনেট চেক করুন।');
+            }
+        }
+
+        function renderHistoryLog() {
+            const container = document.getElementById('historyLogContainer');
+            container.innerHTML = activityHistory.map(l => `<div class="p-1 border-b border-brand-border">${l}</div>`).join('') || 'No Activity Yet.';
+        }
+
+        function clearHistoryLog() {
+            activityHistory = [];
+            localStorage.removeItem('ff_activity_history');
+            renderHistoryLog();
+        }
+
+        function openAddListingModalDirect() {
+            document.getElementById('addListingModal').classList.remove('hidden');
+        }
+        function closeAddListingModal() { window.editingListingId = null; document.getElementById('addListingModal').classList.add('hidden'); }
+
+        function openEditListing(id) {
+            if (!isAdminUser()) return;
+            const item = (window.listings || []).find(i => i.id === id);
+            if (!item) return;
+            window.editingListingId = id;
+            document.getElementById('addUid').value = item.uid && item.uid !== 'N/A' ? item.uid : '';
+            document.getElementById('addTitle').value = item.title || '';
+            document.getElementById('addLevel').value = item.level || 75;
+            document.getElementById('addPrice').value = item.price || '';
+            document.getElementById('addServer').value = item.server || 'BD';
+            document.getElementById('addThumbnailUrlInput').value = item.thumbnailUrl || '';
+            document.getElementById('addDetails').value = item.details || '';
+            document.getElementById('addListingModal').classList.remove('hidden');
+        }
+
+        function saveEditedListing() {
+            const id = window.editingListingId;
+            const item = {
+                id: id,
+                uid: document.getElementById('addUid').value.trim() || 'N/A',
+                title: document.getElementById('addTitle').value.trim(),
+                level: parseInt(document.getElementById('addLevel').value) || 75,
+                price: parseFloat(document.getElementById('addPrice').value) || 0,
+                server: document.getElementById('addServer').value,
+                thumbnailUrl: document.getElementById('addThumbnailUrlInput').value.trim(),
+                details: document.getElementById('addDetails').value.trim()
+            };
+            if (!item.title || !item.price) { alert('Fill Title & Price!'); return; }
+            const idx = window.listings.findIndex(i => i.id === id);
+            if (idx !== -1) window.listings[idx] = item;
+            localStorage.setItem('ff_listings', JSON.stringify(window.listings));
+            if (window.db && window.dbRef && window.dbSet) {
+                window.dbSet(window.dbRef(window.db, 'listings/' + id), item).catch(err => console.log(err));
+            }
+            closeAddListingModal();
+            renderListings();
+            logActivity('Listing Edited', `Edited: ${item.title}`);
+        }
+
+        function submitNewListing() {
+            if (!isAdminUser()) { alert('শুধু অ্যাডমিন লিস্টিং যোগ করতে পারবে।'); return; }
+            if (window.editingListingId) { saveEditedListing(); return; }
+            const newItem = {
+                id: 'ff-' + Date.now(),
+                uid: document.getElementById('addUid').value.trim() || 'N/A',
+                title: document.getElementById('addTitle').value.trim(),
+                level: parseInt(document.getElementById('addLevel').value) || 75,
+                price: parseFloat(document.getElementById('addPrice').value) || 0,
+                server: document.getElementById('addServer').value,
+                thumbnailUrl: document.getElementById('addThumbnailUrlInput').value.trim(),
+                details: document.getElementById('addDetails').value.trim()
+            };
+
+            if(!newItem.title || !newItem.price) { alert('Fill Title & Price!'); return; }
+
+            window.listings.unshift(newItem);
+            localStorage.setItem('ff_listings', JSON.stringify(window.listings));
+
+            if(window.db && window.dbRef && window.dbSet) {
+                window.dbSet(window.dbRef(window.db, 'listings/' + newItem.id), newItem).catch(err => console.log(err));
+            }
+
+            closeAddListingModal();
+            renderListings();
+            logActivity('Listing Added', `New account added: ${newItem.title} (${newItem.uid})`);
+        }
+
+        function promptDeleteListing(id) {
+            if (!isAdminUser()) return;
+            if (confirm('এই লিস্টিং ডিলিট করবেন?')) deleteListing(id);
+        }
+
+        function deleteListing(id) {
+            window.listings = window.listings.filter(item => item.id !== id);
+            localStorage.setItem('ff_listings', JSON.stringify(window.listings));
+
+            if(window.db && window.dbRef && window.dbSet) {
+                window.dbSet(window.dbRef(window.db, 'listings/' + id), null).catch(err => console.log(err));
+            }
+
+            renderListings();
+            logActivity('Listing Deleted', `Removed listing ID: ${id}`);
+            alert('Listing deleted successfully!');
+        }
+
+        window.listings = JSON.parse(localStorage.getItem('ff_listings')) || [];
+        document.addEventListener('click', () => document.querySelectorAll('.gear-menu').forEach(x => x.classList.add('hidden')));
+
+        let currentTab = 'all';
+        function switchTab(t) {
+            currentTab = t;
+            ['all', 'rare', 'max', 'budget', 'wish'].forEach(k => {
+                const b = document.getElementById('tab-' + k);
+                if (!b) return;
+                b.classList.toggle('text-cyan-400', k === t); b.classList.toggle('bg-brand-border/60', k === t);
+                b.classList.toggle('text-gray-300', k !== t);
+            });
+            renderListings();
+        }
+
+        function renderListings() {
+            const grid = document.getElementById('listingsGrid');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const admin = isAdminUser();
+            const rf = getRefunds();
+            const wish = getWish();
+
+            let filtered = (window.listings || []).filter(item => {
+                const okSearch = (item.title || '').toLowerCase().includes(search) || (item.uid && String(item.uid).toLowerCase().includes(search));
+                const lv = document.getElementById('levelFilter').value, sv = document.getElementById('serverFilter').value, pr = document.getElementById('priceFilter').value;
+                const price = +item.price || 0, level = +item.level || 0;
+                if (lv !== 'all' && level < +lv) return false;
+                if (sv !== 'all' && item.server !== sv) return false;
+                if (pr === 'under2000' && price >= 2000) return false;
+                if (pr === '2000-5000' && (price < 2000 || price > 5000)) return false;
+                if (currentTab === 'rare' && !/rare|bundle/i.test(item.title || '')) return false;
+                if (currentTab === 'max' && level < 75) return false;
+                if (currentTab === 'budget' && price > 2000) return false;
+                if (currentTab === 'wish' && !Object.prototype.hasOwnProperty.call(getWish(), item.id)) return false;
+                return okSearch;
+            });
+
+            document.getElementById('listingCount').innerText = `${filtered.length} Items Found`;
+
+            if(filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-8 text-center text-gray-400">No accounts listed yet.</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(item => {
+                const p = +item.price || 0;
+                const eff = Math.max(0, p - (rf[item.id] || 0));
+                const priceHtml = rf[item.id] ? `<s class="text-gray-500 text-xs mr-1">৳ ${p}</s>৳ ${eff}` : `৳ ${p}`;
+                return `
+                <div class="cyber-card rounded-3xl p-4 space-y-3 relative">
+${admin ? `<div class="absolute top-6 right-6 z-20">
+                        <button data-id="${escapeHtml(item.id)}" title="Settings (Admin Only)" class="js-gear w-8 h-8 rounded-full bg-black/70 border border-cyan-400/50 text-cyan-300 flex items-center justify-center text-xs shadow"><i class="fas fa-cog"></i></button>
+                        <div class="gear-menu hidden absolute right-0 mt-1 w-32 bg-black/95 border border-brand-border rounded-xl p-1 text-[11px]">
+                            <button data-act="edit" data-id="${escapeHtml(item.id)}" class="js-gact w-full text-left px-3 py-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-300"><i class="fas fa-pen mr-1"></i>Edit</button>
+                            <button data-act="del" data-id="${escapeHtml(item.id)}" class="js-gact w-full text-left px-3 py-1.5 rounded-lg hover:bg-red-600/30 text-red-300"><i class="fas fa-trash-alt mr-1"></i>Delete</button>
+                        </div>
+                    </div>` : ''}
+
+                    <button data-id="${escapeHtml(item.id)}" title="Save" class="js-wish absolute top-6 left-6 z-10 w-8 h-8 rounded-full bg-black/70 border flex items-center justify-center text-xs transition ${Object.prototype.hasOwnProperty.call(wish, item.id) ? 'text-red-500 border-red-400' : 'text-gray-300 border-gray-500'}"><i class="${Object.prototype.hasOwnProperty.call(wish, item.id) ? 'fas' : 'far'} fa-heart"></i></button>
+                    <div class="bg-black h-48 rounded-2xl overflow-hidden relative">
+                        <img src="${escapeHtml(item.thumbnailUrl || 'https://i.postimg.cc/FfXPJgLc/1791802319594.jpg')}" onerror="this.src='https://i.postimg.cc/FfXPJgLc/1791802319594.jpg'" class="w-full h-full object-cover">
+                    </div>
+                    <h4 class="font-extrabold text-white text-sm pr-8">${escapeHtml(item.title)}</h4>
+                    <p class="text-xs text-cyan-300">UID: ${escapeHtml(item.uid || 'N/A')}</p>
+                    ${ratingSummary[item.id] ? `<p class="text-[11px] text-amber-400 font-bold">★ ${ratingSummary[item.id].avg.toFixed(1)} <span class="text-gray-400 font-normal">(${ratingSummary[item.id].n} রিভিউ)</span></p>` : ''}
+                    <div class="flex justify-between items-center">
+                        <span class="text-amber-400 font-bold text-sm">${priceHtml}</span>
+                        <div class="flex space-x-2">
+                            <button data-id="${escapeHtml(item.id)}" class="js-buy px-4 py-1.5 stylish-btn text-black font-extrabold rounded-full text-xs">Buy Now</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            grid.querySelectorAll('.js-buy').forEach(b => { b.onclick = () => openBuyModal(b.dataset.id); });
+            grid.querySelectorAll('.js-gear').forEach(b => { b.onclick = (e) => { e.stopPropagation(); const m = b.parentElement.querySelector('.gear-menu'); document.querySelectorAll('.gear-menu').forEach(x => { if (x !== m) x.classList.add('hidden'); }); m.classList.toggle('hidden'); }; });
+            grid.querySelectorAll('.js-gact').forEach(b => { b.onclick = (e) => { e.stopPropagation(); if (b.dataset.act === 'edit') openEditListing(b.dataset.id); else promptDeleteListing(b.dataset.id); }; });
+            grid.querySelectorAll('.js-wish').forEach(b => { b.onclick = () => toggleWish(b.dataset.id); });
+        }
+
+        // ---------- Toast ----------
+        function showToast(text) {
+            const t = document.createElement('div');
+            t.textContent = text;
+            t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:90%;z-index:9999;padding:10px 16px;border-radius:14px;background:#0A0F1D;border:1px solid #00F0FF;color:#fff;font-size:12px;font-weight:700;box-shadow:0 0 20px rgba(0,240,255,.4)';
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 4000);
+        }
+
+        // ---------- Offer countdown ----------
+        function tickOfferCountdown() {
+            const box = document.getElementById('offerCountdown');
+            if (!box) return;
+            const end = +(offerSettings && offerSettings.endsAt) || 0;
+            const left = end - Date.now();
+            if (!end || left <= 0) { box.classList.add('hidden'); return; }
+            const d = Math.floor(left / 86400000), h = Math.floor(left % 86400000 / 3600000), m = Math.floor(left % 3600000 / 60000), sec = Math.floor(left % 60000 / 1000);
+            const pad = n => String(n).padStart(2, '0');
+            document.getElementById('offerCdTitle').textContent = '🔥 ' + ((offerSettings.title) || 'Limited Time Offer');
+            document.getElementById('offerCdTime').textContent = (d > 0 ? d + 'd ' : '') + pad(h) + ':' + pad(m) + ':' + pad(sec);
+            box.classList.remove('hidden');
+        }
+        setInterval(tickOfferCountdown, 1000);
+        tickOfferCountdown();
+
+        // ---------- Wishlist ----------
+        function getWish() { return (currentUserRecord && currentUserRecord.wishlist) || {}; }
+
+        async function toggleWish(id) {
+            if (!currentUser) { showToast('আগে লগ ইন করুন।'); return; }
+            const it = (window.listings || []).find(x => x.id === id);
+            if (!it) return;
+            const has = Object.prototype.hasOwnProperty.call(getWish(), id);
+            try {
+                await window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/wishlist/' + id), has ? null : (+it.price || 0));
+            } catch (e) { console.error(e); showToast('সেভ হয়নি, আবার চেষ্টা করুন।'); }
+        }
+
+        const priceDropBusy = {};
+        function checkPriceDrops() {
+            if (!currentUser || !currentUserRecord) return;
+            const w = getWish();
+            (window.listings || []).forEach(it => {
+                if (!Object.prototype.hasOwnProperty.call(w, it.id) || priceDropBusy[it.id]) return;
+                const now = +it.price || 0, was = +w[it.id];
+                if (now === was) return;
+                priceDropBusy[it.id] = 1;
+                if (now < was) showToast('💸 দাম কমেছে: ' + it.title + ' ৳' + was + ' → ৳' + now);
+                window.dbSet(window.dbRef(window.db, 'users/' + currentUser.uid + '/wishlist/' + it.id), now)
+                    .catch(() => {}).finally(() => { delete priceDropBusy[it.id]; });
+            });
+        }
+
+        // ---------- Reviews & ratings ----------
+        let reviewUnsub = null, reviewRating = 5;
+        var ratingSummary = {};
+        let ratingSummaryHooked = false;
+        function hookRatingSummary() {
+            if (ratingSummaryHooked || !currentUser || !window.db || !window.dbOnValue) return;
+            ratingSummaryHooked = true;
+            window.dbOnValue(window.dbRef(window.db, 'reviews'), (snap) => {
+                const all = snap.val() || {}, out = {};
+                Object.keys(all).forEach(id => {
+                    const arr = Object.values(all[id] || {});
+                    if (!arr.length) return;
+                    const sum = arr.reduce((a, r) => a + Math.max(1, Math.min(5, Math.round(+r.rating || 0))), 0);
+                    out[id] = { avg: sum / arr.length, n: arr.length };
+                });
+                ratingSummary = out;
+                renderListings();
+            }, () => { ratingSummaryHooked = false; });
+        }
+
+        function renderReviewStars() {
+            const box = document.getElementById('reviewStars');
+            box.innerHTML = [1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" class="text-lg ${n <= reviewRating ? 'text-amber-400' : 'text-gray-600'}">★</button>`).join('') + '<span class="text-[10px] text-gray-400 ml-1">আপনার রেটিং</span>';
+            box.querySelectorAll('button').forEach(b => { b.onclick = () => { reviewRating = +b.dataset.n; renderReviewStars(); }; });
+        }
+
+        function loadReviews(itemId) {
+            if (reviewUnsub) { reviewUnsub(); reviewUnsub = null; }
+            reviewRating = 5;
+            renderReviewStars();
+            document.getElementById('reviewMsg').classList.add('hidden');
+            document.getElementById('reviewText').value = '';
+            const list = document.getElementById('reviewList'), avgEl = document.getElementById('reviewAvg');
+            list.innerHTML = '<p class="text-gray-500">লোড হচ্ছে...</p>'; avgEl.textContent = '';
+            if (!window.db || !window.dbOnValue) { list.innerHTML = ''; return; }
+            reviewUnsub = window.dbOnValue(window.dbRef(window.db, 'reviews/' + itemId), (snap) => {
+                const arr = Object.values(snap.val() || {}).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                if (!arr.length) { list.innerHTML = '<p class="text-gray-500">এখনো কোনো রিভিউ নেই।</p>'; avgEl.textContent = ''; return; }
+                const clamp = r => Math.max(1, Math.min(5, Math.round(+r.rating || 0)));
+                const avg = arr.reduce((a, r) => a + clamp(r), 0) / arr.length;
+                avgEl.textContent = avg.toFixed(1) + ' ★ (' + arr.length + ')';
+                list.innerHTML = arr.map(r => `<div class="border-b border-brand-border pb-1"><span class="text-amber-400">${'★'.repeat(clamp(r))}</span> <span class="text-cyan-300 font-bold">${escapeHtml(r.name || 'Buyer')}</span><p class="text-gray-300">${escapeHtml(r.text || '')}</p></div>`).join('');
+            }, () => { list.innerHTML = '<p class="text-gray-500">রিভিউ লোড করা যায়নি।</p>'; });
+        }
+
+        async function submitReview() {
+            if (!currentUser) return flashMsg('reviewMsg', 'আগে লগ ইন করুন।', false);
+            if (!currentSelectedItem) return;
+            const text = document.getElementById('reviewText').value.trim().slice(0, 200);
+            const name = String(currentUser.displayName || 'Buyer').slice(0, 40);
+            try {
+                await window.dbSet(window.dbRef(window.db, 'reviews/' + currentSelectedItem.id + '/' + currentUser.uid), { rating: reviewRating, text: text, name: name, ts: Date.now() });
+                flashMsg('reviewMsg', 'ধন্যবাদ! আপনার রিভিউ সেভ হয়েছে।', true);
+            } catch (e) { console.error(e); flashMsg('reviewMsg', 'সেভ হয়নি, আবার চেষ্টা করুন।', false); }
+        }
+    </script>
+</body>
+</html>
